@@ -107,7 +107,7 @@ export function NotificationsView({
               type="button"
               onClick={() => void markRead(n)}
               className={`w-full text-left p-4 sm:p-5 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                n.readAt ? 'bg-white' : 'bg-blue-50/40'
+                n.readAt ? 'bg-white' : 'bg-[#EEF3FC]/65'
               }`}
             >
               <div className="space-y-1 min-w-0">
@@ -116,7 +116,7 @@ export function NotificationsView({
                   {!n.readAt && (
                     <>
                       <span aria-hidden="true"> · </span>
-                      <span className="text-blue-800 font-semibold">Unread</span>
+                      <span className="text-[#0B2B7E] font-semibold">Unread</span>
                     </>
                   )}
                   {n.issueReferenceCode && (

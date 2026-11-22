@@ -111,7 +111,7 @@ export function RecurringConcernsView({
   return (
     <div className="space-y-6">
       <div className="border-b border-slate-200 pb-4">
-        <h1 className="font-display text-2xl font-semibold text-slate-900">
+        <h1 className="font-display text-2xl font-semibold text-[#071A4D]">
           Recurring Concerns
         </h1>
         <p className="text-xs text-slate-600 mt-1">
@@ -145,10 +145,10 @@ export function RecurringConcernsView({
                   return (
                     <div
                       key={key}
-                      className="bg-white border border-amber-300 rounded-xl p-4 sm:p-5 space-y-3"
+                      className="bg-white border border-[#0B2B7E]/30 rounded-xl p-4 sm:p-5 space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <span className="font-semibold text-amber-900">
+                        <span className="font-semibold text-[#0B2B7E]">
                           System Suggestion · {Math.round(pair.suggestion.similarityScore * 100)}% overlap ({pair.suggestion.matchedTerms.join(', ')})
                         </span>
                         <span className="text-slate-500">Requires authorized confirmation</span>
@@ -158,7 +158,7 @@ export function RecurringConcernsView({
                         <button
                           type="button"
                           onClick={() => onSelectIssue(pair.primaryIssue.id)}
-                          className="text-left p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-blue-300"
+                          className="text-left p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-[#0B2B7E]"
                         >
                           <p className="font-mono text-slate-600">
                             {pair.primaryIssue.referenceCode} · {pair.primaryIssue.status}
@@ -171,7 +171,7 @@ export function RecurringConcernsView({
                         <button
                           type="button"
                           onClick={() => onSelectIssue(pair.suggestion.relatedIssueId)}
-                          className="text-left p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-blue-300"
+                          className="text-left p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-[#0B2B7E]"
                         >
                           <p className="font-mono text-slate-600">
                             {pair.suggestion.relatedReferenceCode} · {pair.suggestion.relatedStatus}
@@ -198,7 +198,7 @@ export function RecurringConcernsView({
                             type="button"
                             disabled={savingId === key}
                             onClick={() => void confirmPair(pair)}
-                            className="min-h-[40px] px-4 rounded-lg bg-blue-800 text-white text-xs font-medium inline-flex items-center justify-center gap-1.5"
+                            className="min-h-[40px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium inline-flex items-center justify-center gap-1.5"
                           >
                             <GitMerge className="w-3.5 h-3.5" />
                             <span>Confirm & Group</span>

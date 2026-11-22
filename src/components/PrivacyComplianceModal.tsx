@@ -43,10 +43,15 @@ export function PrivacyComplianceModal({
       aria-labelledby="privacy-modal-title"
     >
       <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[88vh] flex flex-col overflow-hidden">
+        <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
+          <div className="bg-[#D41118]" />
+          <div className="bg-white border-b border-slate-200/70" />
+          <div className="bg-[#0B2B7E]" />
+        </div>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-blue-800 shrink-0" />
-            <h2 id="privacy-modal-title" className="text-base font-semibold text-slate-900">
+            <ShieldCheck className="w-5 h-5 text-[#0B2B7E] shrink-0" />
+            <h2 id="privacy-modal-title" className="text-base font-semibold text-[#071A4D]">
               {data?.title || 'Privacy & Data Protection Notice'}
             </h2>
           </div>
@@ -126,7 +131,7 @@ export function PrivacyComplianceModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] px-5 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors whitespace-nowrap"
+            className="min-h-[44px] px-5 py-2 rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] transition-colors whitespace-nowrap"
           >
             Close Notice
           </button>

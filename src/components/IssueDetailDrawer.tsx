@@ -260,13 +260,18 @@ export function IssueDetailDrawer({
       aria-label="Issue Detail Dossier"
     >
       <div className="bg-white w-full max-w-3xl h-full flex flex-col border-l border-slate-200 overflow-hidden">
+        <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
+          <div className="bg-[#D41118]" />
+          <div className="bg-white border-b border-slate-200/70" />
+          <div className="bg-[#0B2B7E]" />
+        </div>
         {/* Sticky Drawer Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-white">
           <div className="min-w-0">
             <p className="text-xs font-mono text-slate-600 truncate">
               {issue?.referenceCode || 'Loading…'}
             </p>
-            <h2 className="font-display text-base sm:text-lg font-semibold text-slate-900 truncate">
+            <h2 className="font-display text-base sm:text-lg font-semibold text-[#071A4D] truncate">
               {issue?.title || 'Issue Report'}
             </h2>
           </div>
@@ -306,13 +311,13 @@ export function IssueDetailDrawer({
                 <p className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-semibold text-slate-900">{issue.status}</span>
                   <span aria-hidden="true">·</span>
-                  <span className={issue.priority === 'Urgent' ? 'text-red-700 font-semibold' : 'font-medium text-slate-800'}>
+                  <span className={issue.priority === 'Urgent' ? 'text-[#D41118] font-semibold' : 'font-medium text-slate-800'}>
                     Priority: {issue.priority}
                   </span>
                   {issue.isEssential && (
                     <>
                       <span aria-hidden="true">·</span>
-                      <span className="text-blue-800 font-semibold">Essential</span>
+                      <span className="text-[#0B2B7E] font-semibold">Essential</span>
                     </>
                   )}
                   <span aria-hidden="true">·</span>
@@ -325,7 +330,7 @@ export function IssueDetailDrawer({
                   <span className="font-mono tabular-nums">{issue.meetingDate}</span> · Submitted by {issue.submittedByName}
                 </p>
                 {recurringGroup && (
-                  <p className="text-xs text-blue-900 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  <p className="text-xs text-[#071A4D] bg-[#EEF3FC] border border-[#C7D4F2] rounded-lg px-3 py-2">
                     Confirmed Recurring Concern: <strong>{recurringGroup.title}</strong> ({recurringGroup.issueIds.length} linked reports — original report preserved)
                   </p>
                 )}
@@ -398,7 +403,7 @@ export function IssueDetailDrawer({
                           setWorkflowAction(workflowAction === 'escalate' ? null : 'escalate');
                           setActionText('');
                         }}
-                        className="min-h-[42px] px-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 text-xs font-semibold hover:bg-amber-100 inline-flex items-center gap-1.5"
+                        className="min-h-[42px] px-4 rounded-lg border border-[#F5C6C8] bg-[#FDF2F2] text-[#A60D13] text-xs font-semibold hover:bg-[#FCE5E6] inline-flex items-center gap-1.5"
                       >
                         <ArrowUpRight className="w-4 h-4" />
                         <span>
@@ -492,7 +497,7 @@ export function IssueDetailDrawer({
                         <button
                           type="submit"
                           disabled={saving}
-                          className="min-h-[40px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 disabled:opacity-60"
+                          className="min-h-[40px] px-4 rounded-lg bg-[#0B2B7E] text-white text-xs font-medium hover:bg-[#071E5C] disabled:opacity-60"
                         >
                           {saving ? 'Processing…' : 'Confirm Action'}
                         </button>
@@ -575,7 +580,7 @@ export function IssueDetailDrawer({
                         type="checkbox"
                         checked={editEssential}
                         onChange={(e) => setEditEssential(e.target.checked)}
-                        className="w-4 h-4 accent-blue-800"
+                        className="w-4 h-4 accent-[#0B2B7E]"
                       />
                       <span>Essential Issue Tag (tracked separately from priority)</span>
                     </label>
@@ -609,7 +614,7 @@ export function IssueDetailDrawer({
                   <button
                     type="submit"
                     disabled={saving}
-                    className="min-h-[44px] px-5 rounded-lg bg-blue-800 text-white text-xs sm:text-sm font-medium hover:bg-blue-900 disabled:opacity-60"
+                    className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60"
                   >
                     {saving ? 'Saving…' : 'Save Updates & Notes'}
                   </button>
@@ -639,7 +644,7 @@ export function IssueDetailDrawer({
                             <button
                               type="button"
                               onClick={() => onOpenIssue(s.relatedIssueId)}
-                              className="text-xs font-semibold text-blue-900 hover:underline text-left"
+                              className="text-xs font-semibold text-[#0B2B7E] hover:underline text-left"
                             >
                               {s.relatedReferenceCode} · {s.relatedTitle}
                             </button>
@@ -655,7 +660,7 @@ export function IssueDetailDrawer({
                                   setConfirmingSuggestion(s);
                                   setGroupTitle(`Recurring: ${issue.title.slice(0, 60)}`);
                                 }}
-                                className="min-h-[36px] px-3 rounded-lg bg-slate-900 text-white text-xs font-medium inline-flex items-center gap-1"
+                                className="min-h-[36px] px-3 rounded-lg bg-[#071A4D] hover:bg-[#0B2B7E] text-white text-xs font-medium inline-flex items-center gap-1"
                               >
                                 <GitMerge className="w-3.5 h-3.5" />
                                 <span>Confirm Match</span>
@@ -683,7 +688,7 @@ export function IssueDetailDrawer({
                               type="button"
                               disabled={saving}
                               onClick={() => void handleConfirmSuggestion(s)}
-                              className="min-h-[38px] px-4 rounded-lg bg-blue-800 text-white text-xs font-medium"
+                              className="min-h-[38px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
                             >
                               Save Confirmed Group
                             </button>

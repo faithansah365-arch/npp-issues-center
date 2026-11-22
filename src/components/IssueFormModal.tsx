@@ -175,9 +175,14 @@ export function IssueFormModal({
       aria-labelledby="issue-form-title"
     >
       <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
+          <div className="bg-[#D41118]" />
+          <div className="bg-white border-b border-slate-200/70" />
+          <div className="bg-[#0B2B7E]" />
+        </div>
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h2 id="issue-form-title" className="font-display text-lg font-semibold text-slate-900">
+            <h2 id="issue-form-title" className="font-display text-lg font-semibold text-[#071A4D]">
               Submit Party Meeting Concern
             </h2>
             <p className="text-xs text-slate-500">
@@ -403,7 +408,7 @@ export function IssueFormModal({
                 type="checkbox"
                 checked={isEssential}
                 onChange={(e) => setIsEssential(e.target.checked)}
-                className="w-4 h-4 accent-blue-800"
+                className="w-4 h-4 accent-[#0B2B7E]"
               />
               <span>Mark as Essential (separate tag)</span>
             </label>
@@ -492,7 +497,7 @@ export function IssueFormModal({
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-[44px] px-6 rounded-lg bg-blue-800 text-white text-sm font-medium hover:bg-blue-900 disabled:opacity-60"
+              className="min-h-[44px] px-6 rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60"
             >
               {submitting ? 'Submitting Report…' : 'Submit Report'}
             </button>

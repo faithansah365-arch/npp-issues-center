@@ -107,10 +107,10 @@ export function ExecutiveDashboard({
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <p className="text-xs font-medium text-blue-800">
+          <p className="text-xs font-semibold text-[#B30E14] uppercase tracking-wider">
             {user.role === 'SUPER_ADMIN' ? 'Super Admin Portal View' : 'Approved Scope Overview'}
           </p>
-          <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="font-display text-2xl sm:text-3xl font-semibold text-[#071A4D] tracking-tight mt-0.5">
             {roleHeadline}
           </h1>
         </div>
@@ -389,10 +389,10 @@ export function ExecutiveDashboard({
             <button
               type="button"
               onClick={() => onNavigateQueue({ status: '' })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-slate-300 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#0B2B7E]/40 transition-colors"
             >
               <p className="text-xs font-medium text-slate-500">Open Issues</p>
-              <p className="font-display text-3xl font-semibold text-slate-900 tabular-nums mt-2">
+              <p className="font-display text-3xl font-semibold text-[#071A4D] tabular-nums mt-2">
                 {analytics.openIssues}
               </p>
               <p className="text-xs text-slate-500 mt-1 tabular-nums">
@@ -403,10 +403,10 @@ export function ExecutiveDashboard({
             <button
               type="button"
               onClick={() => onNavigateQueue({ priority: 'Urgent' })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-red-300 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#D41118]/40 transition-colors"
             >
-              <p className="text-xs font-medium text-red-700">Urgent Open</p>
-              <p className="font-display text-3xl font-semibold text-red-700 tabular-nums mt-2">
+              <p className="text-xs font-semibold text-[#B30E14]">Urgent Open</p>
+              <p className="font-display text-3xl font-semibold text-[#D41118] tabular-nums mt-2">
                 {analytics.urgentIssues}
               </p>
               <p className="text-xs text-slate-500 mt-1">Immediate attention priority</p>
@@ -415,10 +415,10 @@ export function ExecutiveDashboard({
             <button
               type="button"
               onClick={() => onNavigateQueue({ essentialOnly: true })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#0B2B7E]/40 transition-colors"
             >
-              <p className="text-xs font-medium text-blue-800">Essential Tag</p>
-              <p className="font-display text-3xl font-semibold text-blue-900 tabular-nums mt-2">
+              <p className="text-xs font-semibold text-[#0B2B7E]">Essential Tag</p>
+              <p className="font-display text-3xl font-semibold text-[#0B2B7E] tabular-nums mt-2">
                 {analytics.essentialIssues}
               </p>
               <p className="text-xs text-slate-500 mt-1">Core party & operational matters</p>
@@ -427,10 +427,10 @@ export function ExecutiveDashboard({
             <button
               type="button"
               onClick={() => onNavigateQueue({ overdueOnly: true })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-amber-300 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#D41118]/40 transition-colors"
             >
-              <p className="text-xs font-medium text-amber-800">Overdue Follow-Ups</p>
-              <p className="font-display text-3xl font-semibold text-amber-800 tabular-nums mt-2">
+              <p className="text-xs font-semibold text-[#B30E14]">Overdue Follow-Ups</p>
+              <p className="font-display text-3xl font-semibold text-[#B30E14] tabular-nums mt-2">
                 {analytics.overdueFollowUps}
               </p>
               <p className="text-xs text-slate-500 mt-1">Past scheduled follow-up date</p>
@@ -505,7 +505,7 @@ export function ExecutiveDashboard({
                           </div>
                           <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                             <div
-                              className="h-full bg-blue-800 rounded-full"
+                              className="h-full bg-[#0B2B7E] rounded-full"
                               style={{ width: `${Math.round((row.count / maxVal) * 100)}%` }}
                             />
                           </div>

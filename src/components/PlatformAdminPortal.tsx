@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
   Database,
   Download,
+  Eye,
+  EyeOff,
+  Image as ImageIcon,
   KeyRound,
   LayoutDashboard,
   Lock,
@@ -10,6 +15,7 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   Upload,
   UserPlus,
 } from 'lucide-react';
@@ -18,6 +24,7 @@ import {
   type AuditLogRecord,
   type CategoryRecord,
   type ConstituencyRecord,
+  type HomepageSlideRecord,
   type IssueLevel,
   type IssueRecord,
   type PollingStationRecord,
@@ -61,7 +68,7 @@ interface AdminOverview {
   };
 }
 
-type AdminTab = 'overview' | 'users' | 'taxonomy' | 'settings' | 'audit';
+type AdminTab = 'overview' | 'gallery' | 'users' | 'taxonomy' | 'settings' | 'audit';
 
 export function PlatformAdminPortal({
   onSwitchWorkspace,
@@ -104,8 +111,19 @@ export function PlatformAdminPortal({
   const [stations, setStations] = useState<PollingStationRecord[]>([]);
   const [settings, setSettings] = useState<SystemSettingsRecord | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
+  const [slides, setSlides] = useState<HomepageSlideRecord[]>([]);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [adminFeedback, setAdminFeedback] = useState<string | null>(null);
+
+  // Homepage slider upload & edit state
+  const [slideTitle, setSlideTitle] = useState('');
+  const [slideCaption, setSlideCaption] = useState('');
+  const [slideFile, setSlideFile] = useState<File | null>(null);
+  const [slidePreviewUrl, setSlidePreviewUrl] = useState<string | null>(null);
+  const [slideUploading, setSlideUploading] = useState(false);
+  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
+  const [editSlideTitle, setEditSlideTitle] = useState('');
+  const [editSlideCaption, setEditSlideCaption] = useState('');
 
   // Invite form
   const [invName, setInvName] = useState('');
@@ -162,7 +180,7 @@ export function PlatformAdminPortal({
   async function loadAdminData() {
     setAdminError(null);
     try {
-      const [ov, usr, cats, geo, sets, logs] = await Promise.all([
+      const [ov, usr, cats, geo, sets, logs, slideRes] = await Promise.all([
         apiRequest<AdminOverview>('/api/admin/overview'),
         apiRequest<{ users: PublicUser[] }>('/api/admin/users'),
         apiRequest<{ categories: CategoryRecord[] }>('/api/admin/categories'),
@@ -173,6 +191,7 @@ export function PlatformAdminPortal({
         }>('/api/meta/geography'),
         apiRequest<{ settings: SystemSettingsRecord }>('/api/admin/settings'),
         apiRequest<{ logs: AuditLogRecord[] }>('/api/admin/audit-logs?limit=200'),
+        apiRequest<{ slides: HomepageSlideRecord[] }>('/api/admin/slides'),
       ]);
       setOverview(ov);
       setUsers(usr.users);
@@ -182,6 +201,7 @@ export function PlatformAdminPortal({
       setStations(geo.pollingStations);
       setSettings(sets.settings);
       setAuditLogs(logs.logs);
+      setSlides(slideRes.slides);
     } catch (err) {
       setAdminError((err as Error).message);
     }
@@ -487,9 +507,116 @@ export function PlatformAdminPortal({
     }
   }
 
+  function handleSlideFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    if (slidePreviewUrl) {
+      URL.revokeObjectURL(slidePreviewUrl);
+    }
+    setSlideFile(file);
+    setSlidePreviewUrl(file ? URL.createObjectURL(file) : null);
+  }
+
+  async function handleAddSlide(e: React.FormEvent) {
+    e.preventDefault();
+    if (!slideFile) {
+      setAdminError('Please select a JPEG, PNG, or WEBP image file.');
+      return;
+    }
+    setAdminError(null);
+    setAdminFeedback(null);
+    setSlideUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('title', slideTitle.trim());
+      fd.append('caption', slideCaption.trim());
+      fd.append('image', slideFile);
+      await apiRequest<{ slide: HomepageSlideRecord }>('/api/admin/slides', {
+        method: 'POST',
+        body: fd,
+        isFormData: true,
+      });
+      setSlideTitle('');
+      setSlideCaption('');
+      if (slidePreviewUrl) URL.revokeObjectURL(slidePreviewUrl);
+      setSlidePreviewUrl(null);
+      setSlideFile(null);
+      setAdminFeedback('Homepage slider image uploaded and published.');
+      await loadAdminData();
+    } catch (err) {
+      setAdminError((err as Error).message);
+    } finally {
+      setSlideUploading(false);
+    }
+  }
+
+  async function handleToggleSlide(slide: HomepageSlideRecord) {
+    setAdminError(null);
+    try {
+      await apiRequest(`/api/admin/slides/${slide.id}`, {
+        method: 'PATCH',
+        body: { active: !slide.active },
+      });
+      await loadAdminData();
+    } catch (err) {
+      setAdminError((err as Error).message);
+    }
+  }
+
+  async function handleMoveSlide(index: number, direction: -1 | 1) {
+    const targetIdx = index + direction;
+    if (targetIdx < 0 || targetIdx >= slides.length) return;
+    const current = slides[index];
+    const swapWith = slides[targetIdx];
+    setAdminError(null);
+    try {
+      await Promise.all([
+        apiRequest(`/api/admin/slides/${current.id}`, {
+          method: 'PATCH',
+          body: { sortOrder: targetIdx + 1 },
+        }),
+        apiRequest(`/api/admin/slides/${swapWith.id}`, {
+          method: 'PATCH',
+          body: { sortOrder: index + 1 },
+        }),
+      ]);
+      await loadAdminData();
+    } catch (err) {
+      setAdminError((err as Error).message);
+    }
+  }
+
+  async function handleSaveSlideEdit(slideId: string) {
+    setAdminError(null);
+    try {
+      await apiRequest(`/api/admin/slides/${slideId}`, {
+        method: 'PATCH',
+        body: {
+          title: editSlideTitle.trim(),
+          caption: editSlideCaption.trim(),
+        },
+      });
+      setEditingSlideId(null);
+      setAdminFeedback('Homepage slide details updated.');
+      await loadAdminData();
+    } catch (err) {
+      setAdminError((err as Error).message);
+    }
+  }
+
+  async function handleDeleteSlide(slide: HomepageSlideRecord) {
+    setAdminError(null);
+    try {
+      await apiRequest(`/api/admin/slides/${slide.id}`, { method: 'DELETE' });
+      setAdminFeedback(`Removed "${slide.title}" from homepage gallery.`);
+      await loadAdminData();
+    } catch (err) {
+      setAdminError((err as Error).message);
+    }
+  }
+
   if (authLoading || statusLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-sm text-slate-600">
+      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-6 text-sm text-[#071A4D]">
         Verifying platform administration state…
       </div>
     );
@@ -498,15 +625,21 @@ export function PlatformAdminPortal({
   // Case 1: Zero Super Admins exist -> Secure First-Admin Bootstrap
   if (setupStatus && !setupStatus.hasSuperAdmin) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+      <div className="min-h-screen bg-[#071A4D] text-slate-100 flex items-center justify-center p-4 sm:p-8">
+        <div className="w-full max-w-lg bg-[#09205E] border border-white/15 rounded-2xl overflow-hidden shadow-xl">
+          <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
+            <div className="bg-[#D41118]" />
+            <div className="bg-white" />
+            <div className="bg-[#0B2B7E]" />
+          </div>
+          <div className="p-6 sm:p-8 space-y-6">
           <div className="flex items-center gap-3">
             <BrandMark size={30} />
             <div>
               <h1 className="font-display text-lg font-semibold text-white">
                 First Super Admin Setup
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-white/75">
                 Protected initial platform provisioning
               </p>
             </div>
@@ -539,7 +672,7 @@ export function PlatformAdminPortal({
               <button
                 type="button"
                 onClick={loadSetupStatus}
-                className="min-h-[42px] px-4 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white inline-flex items-center gap-2"
+                className="min-h-[42px] px-4 rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-xs font-medium text-white inline-flex items-center gap-2"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Re-check Server Status</span>
@@ -570,7 +703,7 @@ export function PlatformAdminPortal({
                   loadSetupStatus();
                   void refreshSession();
                 }}
-                className="w-full min-h-[46px] rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium"
+                className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
               >
                 Enter Platform Admin Console
               </button>
@@ -591,31 +724,31 @@ export function PlatformAdminPortal({
                   required
                   value={bootSecret}
                   onChange={(e) => setBootSecret(e.target.value)}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-300 mb-1">Full Name</label>
+                <label className="block text-xs text-white/85 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={bootName}
                   onChange={(e) => setBootName(e.target.value)}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-300 mb-1">Administrator Email</label>
+                <label className="block text-xs text-white/85 mb-1">Administrator Email</label>
                 <input
                   type="email"
                   required
                   value={bootEmail}
                   onChange={(e) => setBootEmail(e.target.value)}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-300 mb-1">
+                <label className="block text-xs text-white/85 mb-1">
                   Strong Password (min 12 chars, upper, lower, digit, symbol)
                 </label>
                 <input
@@ -623,13 +756,13 @@ export function PlatformAdminPortal({
                   required
                   value={bootPassword}
                   onChange={(e) => setBootPassword(e.target.value)}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
                 />
               </div>
               <button
                 type="submit"
                 disabled={bootSubmitting}
-                className="w-full min-h-[46px] rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium"
+                className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
               >
                 {bootSubmitting ? 'Preparing MFA…' : 'Continue to Mandatory MFA Setup'}
               </button>
@@ -641,19 +774,19 @@ export function PlatformAdminPortal({
                   {bootError}
                 </div>
               )}
-              <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#06153F] border border-white/15">
                 <img
                   src={bootStep2.qrDataUrl}
                   alt="Super Admin MFA QR Code"
                   className="w-44 h-44 bg-white p-2 rounded-lg"
                 />
-                <p className="text-xs text-slate-400 text-center">
+                <p className="text-xs text-white/75 text-center">
                   Scan in your authenticator app or enter key:{' '}
                   <span className="font-mono text-white break-all">{bootStep2.manualSecret}</span>
                 </p>
               </div>
               <div>
-                <label className="block text-xs text-slate-300 mb-1">
+                <label className="block text-xs text-white/85 mb-1">
                   6-Digit Authenticator Code
                 </label>
                 <input
@@ -663,18 +796,19 @@ export function PlatformAdminPortal({
                   required
                   value={bootTotp}
                   onChange={(e) => setBootTotp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 font-mono text-sm tracking-widest text-white"
+                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 font-mono text-sm tracking-widest text-white"
                 />
               </div>
               <button
                 type="submit"
                 disabled={bootSubmitting}
-                className="w-full min-h-[46px] rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium"
+                className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
               >
                 {bootSubmitting ? 'Activating…' : 'Verify & Create Super Admin'}
               </button>
             </form>
           )}
+          </div>
         </div>
       </div>
     );
@@ -683,49 +817,57 @@ export function PlatformAdminPortal({
   // Case 2: Not signed in -> Dedicated Platform Admin Sign In
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-5">
+      <div className="min-h-screen bg-[#071A4D] text-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#09205E] border border-white/15 rounded-2xl overflow-hidden shadow-xl">
+          <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
+            <div className="bg-[#D41118]" />
+            <div className="bg-white" />
+            <div className="bg-[#0B2B7E]" />
+          </div>
+          <div className="p-6 sm:p-8 space-y-5">
           <div className="flex items-center gap-3">
-            <Lock className="w-5 h-5 text-blue-400" />
+            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+              <Lock className="w-4 h-4 text-[#D41118]" />
+            </div>
             <div>
               <h1 className="font-display text-lg font-semibold text-white">
                 Platform Administration Sign In
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-white/75">
                 Restricted to authorized Super Administrators with MFA
               </p>
             </div>
           </div>
 
           {loginError && (
-            <div className="rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-xs text-red-200">
+            <div className="rounded-lg border border-[#F5C6C8]/40 bg-[#D41118]/25 p-3 text-xs text-red-100">
               {loginError}
             </div>
           )}
 
           <form onSubmit={handleAdminLogin} className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-300 mb-1">Admin Email</label>
+              <label className="block text-xs text-white/85 mb-1">Admin Email</label>
               <input
                 type="email"
                 required
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-300 mb-1">Password</label>
+              <label className="block text-xs text-white/85 mb-1">Password</label>
               <input
                 type="password"
                 required
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 text-sm text-white"
+                className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-300 mb-1">
+              <label className="block text-xs text-white/85 mb-1">
                 6-Digit Authenticator Code
               </label>
               <input
@@ -735,17 +877,18 @@ export function PlatformAdminPortal({
                 required
                 value={loginTotp}
                 onChange={(e) => setLoginTotp(e.target.value.replace(/\D/g, ''))}
-                className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3.5 font-mono text-sm tracking-widest text-white"
+                className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 font-mono text-sm tracking-widest text-white"
               />
             </div>
             <button
               type="submit"
               disabled={loginSubmitting}
-              className="w-full min-h-[46px] rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium"
+              className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
             >
               {loginSubmitting ? 'Verifying…' : 'Sign In to Platform Admin'}
             </button>
           </form>
+          </div>
         </div>
       </div>
     );
@@ -754,10 +897,16 @@ export function PlatformAdminPortal({
   // Case 3: Signed in as Executive (NOT SUPER_ADMIN) -> Backend & Frontend 403 Deny
   if (user.role !== 'SUPER_ADMIN') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white border border-red-200 rounded-2xl p-6 text-center space-y-4">
-          <ShieldAlert className="w-8 h-8 text-red-700 mx-auto" />
-          <h1 className="font-display text-lg font-semibold text-slate-900">
+      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white border border-[#F5C6C8] rounded-2xl overflow-hidden text-center">
+          <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
+            <div className="bg-[#D41118]" />
+            <div className="bg-white border-b border-slate-200/70" />
+            <div className="bg-[#0B2B7E]" />
+          </div>
+          <div className="p-6 space-y-4">
+          <ShieldAlert className="w-8 h-8 text-[#D41118] mx-auto" />
+          <h1 className="font-display text-lg font-semibold text-[#071A4D]">
             403 — Access Restricted
           </h1>
           <p className="text-xs text-slate-600 leading-relaxed">
@@ -765,10 +914,11 @@ export function PlatformAdminPortal({
           </p>
           <a
             href="/"
-            className="inline-flex items-center justify-center min-h-[44px] px-5 rounded-lg bg-slate-900 text-white text-sm font-medium"
+            className="inline-flex items-center justify-center min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium"
           >
             Return to Executive Portal
           </a>
+          </div>
         </div>
       </div>
     );
@@ -785,16 +935,21 @@ export function PlatformAdminPortal({
     : [];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-950 text-white border-b border-slate-800">
+    <div className="min-h-screen bg-[#F7F9FC]">
+      <header className="bg-[#071A4D] text-white border-b border-[#0B2B7E]">
+        <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
+          <div className="bg-[#D41118]" />
+          <div className="bg-white" />
+          <div className="bg-[#0B2B7E]" />
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
-            <BrandMark size={26} />
+            <BrandMark size={28} />
             <div className="min-w-0">
               <p className="font-display text-sm sm:text-base font-semibold truncate">
                 Platform Administration Console
               </p>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-white/75 truncate">
                 {user.fullName} · Super Admin (Full Portal Access)
               </p>
             </div>
@@ -802,7 +957,7 @@ export function PlatformAdminPortal({
           <button
             type="button"
             onClick={() => void logout()}
-            className="min-h-[40px] px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white inline-flex items-center gap-2 whitespace-nowrap shrink-0"
+            className="min-h-[40px] px-3.5 rounded-lg bg-white/10 hover:bg-[#D41118] text-xs font-medium text-white inline-flex items-center gap-2 whitespace-nowrap shrink-0 transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
@@ -810,10 +965,10 @@ export function PlatformAdminPortal({
         </div>
 
         {/* Direct Access to All Four Executive Portals */}
-        <div className="bg-slate-900 border-t border-slate-800">
+        <div className="bg-[#0B2B7E] border-t border-white/15">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-medium text-slate-300 flex items-center gap-1.5">
-              <LayoutDashboard className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-[11px] font-medium text-white/90 flex items-center gap-1.5">
+              <LayoutDashboard className="w-3.5 h-3.5 text-white" />
               <span>Open Executive Dashboard:</span>
             </span>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -835,7 +990,7 @@ export function PlatformAdminPortal({
                       window.location.href = '/';
                     }
                   }}
-                  className="min-h-[34px] px-3 rounded-lg bg-slate-800 hover:bg-blue-700 text-xs font-medium text-slate-100 transition-colors whitespace-nowrap"
+                  className="min-h-[34px] px-3 rounded-lg bg-white/15 hover:bg-[#D41118] text-xs font-medium text-white transition-colors whitespace-nowrap"
                 >
                   {portal.label}
                 </button>
@@ -847,9 +1002,10 @@ export function PlatformAdminPortal({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Sub-Navigation */}
-        <nav className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl overflow-x-auto">
+        <nav className="flex items-center gap-1 p-1 bg-[#E6ECF7] rounded-xl overflow-x-auto">
           {[
             { id: 'overview', label: 'Readiness & Backups' },
+            { id: 'gallery', label: 'Homepage Images' },
             { id: 'users', label: 'Accounts & Scopes' },
             { id: 'taxonomy', label: 'Categories & Geography' },
             { id: 'settings', label: 'Privacy & Retention' },
@@ -861,8 +1017,8 @@ export function PlatformAdminPortal({
               onClick={() => setActiveTab(t.id as AdminTab)}
               className={`min-h-[40px] px-4 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === t.id
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#071A4D] font-semibold border-b-2 border-[#D41118] shadow-xs'
+                  : 'text-[#071A4D]/75 hover:text-[#071A4D]'
               }`}
             >
               {t.label}
@@ -882,12 +1038,12 @@ export function PlatformAdminPortal({
         )}
 
         {lastIssuedLink && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs space-y-2">
-            <p className="font-semibold text-blue-950">{lastIssuedLink.label}</p>
-            <p className="text-blue-900">
+          <div className="rounded-xl border border-[#C7D4F2] bg-[#EEF3FC] p-4 text-xs space-y-2">
+            <p className="font-semibold text-[#071A4D]">{lastIssuedLink.label}</p>
+            <p className="text-[#0B2B7E]">
               Email delivery: {lastIssuedLink.emailSent ? 'Sent via SMTP.' : `Not emailed — ${lastIssuedLink.note}`}
             </p>
-            <p className="font-mono bg-white border border-blue-200 rounded p-2 break-all text-slate-900">
+            <p className="font-mono bg-white border border-[#C7D4F2] rounded p-2 break-all text-slate-900">
               {lastIssuedLink.url}
             </p>
           </div>
@@ -938,7 +1094,7 @@ export function PlatformAdminPortal({
             {/* Production Security Readiness Checklist */}
             <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-blue-800" />
+                <ShieldCheck className="w-5 h-5 text-[#0B2B7E]" />
                 <h2 className="text-sm font-semibold text-slate-900">
                   Pre-Production Security Configuration Status
                 </h2>
@@ -1008,7 +1164,7 @@ export function PlatformAdminPortal({
               <div className="flex flex-wrap gap-3">
                 <a
                   href="/api/admin/backup/export"
-                  className="min-h-[42px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium inline-flex items-center gap-2 hover:bg-slate-800"
+                  className="min-h-[42px] px-4 rounded-lg bg-[#071A4D] hover:bg-[#0B2B7E] text-white text-xs font-medium inline-flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   <span>Export Backup JSON</span>
@@ -1028,6 +1184,242 @@ export function PlatformAdminPortal({
           </div>
         )}
 
+        {/* TAB: HOMEPAGE GALLERY SLIDER */}
+        {activeTab === 'gallery' && (
+          <div className="space-y-6">
+            <form
+              onSubmit={handleAddSlide}
+              className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-4"
+            >
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-[#0B2B7E]" />
+                <h2 className="text-sm font-semibold text-[#071A4D]">
+                  Add Image to Homepage Slider
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                <div className="lg:col-span-5 space-y-2">
+                  <label
+                    htmlFor="slide-file-input"
+                    className="block aspect-[16/9] rounded-xl border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 overflow-hidden cursor-pointer relative"
+                  >
+                    {slidePreviewUrl ? (
+                      <img
+                        src={slidePreviewUrl}
+                        alt="New slide preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-xs text-slate-600 gap-2">
+                        <Upload className="w-5 h-5 text-[#0B2B7E]" />
+                        <span>Click to choose JPEG, PNG, or WEBP (max 4 MB)</span>
+                      </div>
+                    )}
+                    <input
+                      id="slide-file-input"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                      onChange={handleSlideFileChange}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                <div className="lg:col-span-7 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Headline / Title
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      minLength={2}
+                      maxLength={100}
+                      placeholder="e.g. National Delegates Conference"
+                      value={slideTitle}
+                      onChange={(e) => setSlideTitle(e.target.value)}
+                      className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Short Caption (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      maxLength={260}
+                      placeholder="Brief description shown over the homepage slider"
+                      value={slideCaption}
+                      onChange={(e) => setSlideCaption(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={slideUploading}
+                      className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs sm:text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{slideUploading ? 'Uploading…' : 'Add to Homepage Slider'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-[#071A4D]">
+                  Homepage Slider Images ({slides.length})
+                </h2>
+                <span className="text-xs text-slate-500">
+                  Active slides animate automatically on the front page
+                </span>
+              </div>
+
+              {slides.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4">
+                  No homepage slider images saved yet. Upload an image above.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                  {slides.map((slide, idx) => (
+                    <div
+                      key={slide.id}
+                      className="p-4 flex flex-col md:flex-row md:items-center gap-4"
+                    >
+                      <div className="w-full md:w-48 aspect-[16/9] rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                        <img
+                          src={slide.imageUrl}
+                          alt={slide.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {editingSlideId === slide.id ? (
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={editSlideTitle}
+                              onChange={(e) => setEditSlideTitle(e.target.value)}
+                              className="w-full min-h-[38px] rounded-lg border border-slate-300 px-3 text-sm"
+                            />
+                            <input
+                              type="text"
+                              value={editSlideCaption}
+                              onChange={(e) => setEditSlideCaption(e.target.value)}
+                              placeholder="Caption"
+                              className="w-full min-h-[38px] rounded-lg border border-slate-300 px-3 text-xs"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveSlideEdit(slide.id)}
+                                className="min-h-[34px] px-3 rounded-lg bg-[#0B2B7E] text-white text-xs font-medium"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSlideId(null)}
+                                className="min-h-[34px] px-3 rounded-lg border border-slate-300 text-xs text-slate-700"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-xs text-slate-500">
+                              Slide {idx + 1} ·{' '}
+                              <span
+                                className={
+                                  slide.active
+                                    ? 'text-emerald-700 font-semibold'
+                                    : 'text-slate-500 font-medium'
+                                }
+                              >
+                                {slide.active ? 'Visible on Homepage' : 'Hidden'}
+                              </span>
+                            </p>
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {slide.title}
+                            </p>
+                            {slide.caption && (
+                              <p className="text-xs text-slate-600 line-clamp-2">{slide.caption}</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => void handleMoveSlide(idx, -1)}
+                          className="min-h-[36px] min-w-[36px] rounded-lg border border-slate-300 flex items-center justify-center text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                          aria-label="Move slide up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === slides.length - 1}
+                          onClick={() => void handleMoveSlide(idx, 1)}
+                          className="min-h-[36px] min-w-[36px] rounded-lg border border-slate-300 flex items-center justify-center text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                          aria-label="Move slide down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSlideId(slide.id);
+                            setEditSlideTitle(slide.title);
+                            setEditSlideCaption(slide.caption);
+                          }}
+                          className="min-h-[36px] px-3 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleSlide(slide)}
+                          className="min-h-[36px] px-3 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5"
+                        >
+                          {slide.active ? (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5" />
+                              <span>Hide</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Show</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteSlide(slide)}
+                          className="min-h-[36px] px-3 rounded-lg border border-[#F5C6C8] bg-[#FDF2F2] text-[#A60D13] hover:bg-[#FCE5E6] text-xs font-medium inline-flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* TAB 2: ACCOUNTS & SCOPES */}
         {activeTab === 'users' && (
           <div className="space-y-6">
@@ -1036,7 +1428,7 @@ export function PlatformAdminPortal({
               className="bg-white border border-slate-200 rounded-xl p-5 space-y-4"
             >
               <div className="flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-blue-800" />
+                <UserPlus className="w-4 h-4 text-[#0B2B7E]" />
                 <h2 className="text-sm font-semibold text-slate-900">
                   Invite & Approve Executive or Admin Account
                 </h2>
@@ -1164,7 +1556,7 @@ export function PlatformAdminPortal({
                       type="button"
                       disabled={quickPsCreating || quickPsName.trim().length < 2}
                       onClick={() => void handleQuickCreateStation()}
-                      className="min-h-[38px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium disabled:opacity-50"
+                      className="min-h-[38px] px-4 rounded-lg bg-[#071A4D] hover:bg-[#0B2B7E] text-white text-xs font-medium disabled:opacity-50"
                     >
                       {quickPsCreating ? 'Saving…' : 'Register Station'}
                     </button>
@@ -1175,7 +1567,7 @@ export function PlatformAdminPortal({
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="min-h-[44px] px-5 rounded-lg bg-blue-800 text-white text-xs font-medium hover:bg-blue-900"
+                  className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
                 >
                   Create Approved Invitation
                 </button>
@@ -1290,7 +1682,7 @@ export function PlatformAdminPortal({
                 />
                 <button
                   type="submit"
-                  className="min-h-[40px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium inline-flex items-center gap-1"
+                  className="min-h-[40px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium inline-flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add</span>
@@ -1353,7 +1745,7 @@ export function PlatformAdminPortal({
                 </div>
                 <button
                   type="submit"
-                  className="min-h-[38px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium"
+                  className="min-h-[38px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
                 >
                   Save Constituency
                 </button>
@@ -1409,7 +1801,7 @@ export function PlatformAdminPortal({
                 </div>
                 <button
                   type="submit"
-                  className="min-h-[38px] px-4 rounded-lg bg-slate-900 text-white text-xs font-medium"
+                  className="min-h-[38px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
                 >
                   Save Polling Station
                 </button>
@@ -1619,7 +2011,7 @@ export function PlatformAdminPortal({
                           },
                         })
                       }
-                      className="w-4 h-4 accent-blue-800"
+                      className="w-4 h-4 accent-[#0B2B7E]"
                     />
                     <span>{item.label}</span>
                   </label>
@@ -1630,7 +2022,7 @@ export function PlatformAdminPortal({
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="min-h-[44px] px-6 rounded-lg bg-blue-800 text-white text-sm font-medium hover:bg-blue-900"
+                className="min-h-[44px] px-6 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium"
               >
                 Save Policy & Security Settings
               </button>
@@ -1670,7 +2062,7 @@ export function PlatformAdminPortal({
                         <td
                           className={`py-2.5 px-4 font-semibold whitespace-nowrap ${
                             log.severity === 'CRITICAL'
-                              ? 'text-red-700'
+                              ? 'text-[#D41118]'
                               : log.severity === 'WARNING'
                                 ? 'text-amber-800'
                                 : 'text-slate-600'
@@ -1727,7 +2119,7 @@ export function PlatformAdminPortal({
               </div>
               <button
                 type="submit"
-                className="min-h-[40px] px-4 rounded-lg bg-amber-800 text-white text-xs font-medium"
+                className="min-h-[40px] px-4 rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-xs font-medium"
               >
                 Log Break-Glass Access & Inspect
               </button>

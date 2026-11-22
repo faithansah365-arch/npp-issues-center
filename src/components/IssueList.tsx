@@ -108,17 +108,17 @@ export function IssueList({
   }
 
   const priorityTextColor = (p: string) => {
-    if (p === 'Urgent') return 'text-red-700 font-semibold';
-    if (p === 'High') return 'text-amber-800 font-semibold';
+    if (p === 'Urgent') return 'text-[#D41118] font-semibold';
+    if (p === 'High') return 'text-[#B30E14] font-medium';
     if (p === 'Normal') return 'text-slate-700';
     return 'text-slate-500';
   };
 
   const statusTextColor = (s: string) => {
     if (s === 'Resolved') return 'text-emerald-700 font-medium';
-    if (s === 'Escalated') return 'text-red-700 font-medium';
+    if (s === 'Escalated') return 'text-[#D41118] font-semibold';
     if (s === 'Closed with reason') return 'text-slate-500 font-medium';
-    if (s === 'New') return 'text-blue-800 font-medium';
+    if (s === 'New') return 'text-[#0B2B7E] font-semibold';
     return 'text-slate-800 font-medium';
   };
 
@@ -180,7 +180,7 @@ export function IssueList({
               value={filters.search}
               onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
               placeholder="Search by reference code, title, description, or station…"
-              className="w-full min-h-[44px] pl-10 pr-3.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700"
+              className="w-full min-h-[44px] pl-10 pr-3.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0B2B7E]"
             />
           </div>
           <label className="min-h-[44px] px-3.5 rounded-lg border border-slate-300 flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer whitespace-nowrap shrink-0">
@@ -188,7 +188,7 @@ export function IssueList({
               type="checkbox"
               checked={filters.essentialOnly}
               onChange={(e) => onFiltersChange({ ...filters, essentialOnly: e.target.checked })}
-              className="w-4 h-4 accent-blue-800"
+              className="w-4 h-4 accent-[#0B2B7E]"
             />
             <span>Essential Only</span>
           </label>
@@ -344,7 +344,7 @@ export function IssueList({
           <button
             type="button"
             onClick={onNewIssue}
-            className="min-h-[44px] px-5 rounded-lg bg-blue-800 text-white text-sm font-medium hover:bg-blue-900"
+            className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C]"
           >
             Submit First Concern
           </button>
@@ -396,7 +396,7 @@ export function IssueList({
                       {issue.isEssential && (
                         <>
                           <span aria-hidden="true" className="text-slate-400"> · </span>
-                          <span className="text-blue-800 font-semibold">Essential</span>
+                          <span className="text-[#0B2B7E] font-semibold">Essential</span>
                         </>
                       )}
                     </td>
@@ -405,7 +405,7 @@ export function IssueList({
                       {issue.isOverdue && (
                         <>
                           <span aria-hidden="true" className="text-slate-400"> · </span>
-                          <span className="text-red-700 font-semibold">Overdue</span>
+                          <span className="text-[#D41118] font-semibold">Overdue</span>
                         </>
                       )}
                     </td>
@@ -438,13 +438,13 @@ export function IssueList({
                     {issue.isEssential && (
                       <>
                         <span aria-hidden="true"> · </span>
-                        <span className="text-blue-800 font-semibold">Essential</span>
+                        <span className="text-[#0B2B7E] font-semibold">Essential</span>
                       </>
                     )}
                     {issue.isOverdue && (
                       <>
                         <span aria-hidden="true"> · </span>
-                        <span className="text-red-700 font-semibold">Overdue</span>
+                        <span className="text-[#D41118] font-semibold">Overdue</span>
                       </>
                     )}
                   </p>

@@ -6,6 +6,7 @@ import {
   type AuditLogRecord,
   type CategoryRecord,
   type ConstituencyRecord,
+  type HomepageSlideRecord,
   type InviteRecord,
   type IssueRecord,
   type NotificationRecord,
@@ -39,6 +40,7 @@ interface DevDatabaseShape {
   notifications: NotificationRecord[];
   auditLogs: AuditLogRecord[];
   settings: SystemSettingsRecord | null;
+  homepageSlides?: HomepageSlideRecord[];
 }
 
 export interface BackupPayload {
@@ -57,6 +59,7 @@ export interface BackupPayload {
     notifications: NotificationRecord[];
     auditLogs: AuditLogRecord[];
     settings: SystemSettingsRecord | null;
+    homepageSlides?: HomepageSlideRecord[];
   };
 }
 
@@ -100,6 +103,54 @@ function createInitialCategories(): CategoryRecord[] {
   }));
 }
 
+function createDefaultHomepageSlides(): HomepageSlideRecord[] {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: 'slide-default-1',
+      title: 'Development in Freedom',
+      caption:
+        'New Patriotic Party delegates, organizers, and leadership working together across all 16 regions of Ghana.',
+      imageUrl: '/src/assets/images/npp_civic_assembly_1795358498204.jpg',
+      storageKey: null,
+      mimeType: 'image/jpeg',
+      sortOrder: 1,
+      active: true,
+      uploadedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'slide-default-2',
+      title: 'Coordinated Executive Leadership',
+      caption:
+        'Polling-station, constituency, regional, and national executives reviewing community priorities and action plans.',
+      imageUrl: '/src/assets/images/npp_executive_forum_1795358497409.jpg',
+      storageKey: null,
+      mimeType: 'image/jpeg',
+      sortOrder: 2,
+      active: true,
+      uploadedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'slide-default-3',
+      title: 'Rooted in Every Constituency',
+      caption:
+        'Listening to citizens across all 276 parliamentary constituencies and turning local concerns into timely action.',
+      imageUrl: '/src/assets/images/npp_community_outreach_1795358498035.jpg',
+      storageKey: null,
+      mimeType: 'image/jpeg',
+      sortOrder: 3,
+      active: true,
+      uploadedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}
+
 class DataStore {
   private mongoClient: MongoClient | null = null;
   private mongoDb: Db | null = null;
@@ -120,10 +171,12 @@ class DataStore {
     notifications: [],
     auditLogs: [],
     settings: null,
+    homepageSlides: undefined,
   };
 
   async init(): Promise<void> {
     fs.mkdirSync(config.uploadsDir, { recursive: true });
+    fs.mkdirSync(path.join(config.uploadsDir, 'slides'), { recursive: true });
 
     if (config.mongodbUri) {
       try {
@@ -237,6 +290,16 @@ class DataStore {
     if (!settings) {
       await this.saveSettings(createDefaultSettings());
     }
+
+    if (this.mode === 'mongodb_atlas') {
+      const existingSlidesCount = await this.col<HomepageSlideRecord>('homepageSlides').countDocuments();
+      if (existingSlidesCount === 0) {
+        await this.col<HomepageSlideRecord>('homepageSlides').insertMany(createDefaultHomepageSlides());
+      }
+    } else if (!this.devState.homepageSlides) {
+      this.devState.homepageSlides = createDefaultHomepageSlides();
+    }
+
     this.persistDev();
   }
 
@@ -557,6 +620,50 @@ class DataStore {
     this.persistDev();
   }
 
+  // Homepage Slides
+  async listHomepageSlides(): Promise<HomepageSlideRecord[]> {
+    if (this.mode === 'mongodb_atlas') {
+      return this.col<HomepageSlideRecord>('homepageSlides')
+        .find({}, { projection: { _id: 0 } })
+        .sort({ sortOrder: 1, createdAt: 1 })
+        .toArray();
+    }
+    return [...(this.devState.homepageSlides ?? [])].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt),
+    );
+  }
+
+  async getHomepageSlideById(id: string): Promise<HomepageSlideRecord | null> {
+    if (this.mode === 'mongodb_atlas') {
+      return this.col<HomepageSlideRecord>('homepageSlides').findOne({ id }, { projection: { _id: 0 } });
+    }
+    return (this.devState.homepageSlides ?? []).find((s) => s.id === id) || null;
+  }
+
+  async saveHomepageSlide(slide: HomepageSlideRecord): Promise<void> {
+    if (this.mode === 'mongodb_atlas') {
+      await this.col<HomepageSlideRecord>('homepageSlides').replaceOne({ id: slide.id }, slide, { upsert: true });
+      return;
+    }
+    if (!this.devState.homepageSlides) {
+      this.devState.homepageSlides = [];
+    }
+    const idx = this.devState.homepageSlides.findIndex((s) => s.id === slide.id);
+    if (idx >= 0) this.devState.homepageSlides[idx] = slide;
+    else this.devState.homepageSlides.push(slide);
+    this.persistDev();
+  }
+
+  async deleteHomepageSlide(id: string): Promise<void> {
+    if (this.mode === 'mongodb_atlas') {
+      await this.col<HomepageSlideRecord>('homepageSlides').deleteOne({ id });
+      return;
+    }
+    if (!this.devState.homepageSlides) return;
+    this.devState.homepageSlides = this.devState.homepageSlides.filter((s) => s.id !== id);
+    this.persistDev();
+  }
+
   private async stripLegacySampleData(): Promise<void> {
     const legacyMockStationIds = [
       'ps-bantama-presby-a',
@@ -655,6 +762,7 @@ class DataStore {
       recurringDismissals,
       auditLogs,
       settings,
+      homepageSlides,
     ] = await Promise.all([
       this.listRegions(),
       this.listConstituencies(),
@@ -666,6 +774,7 @@ class DataStore {
       this.listRecurringDismissals(),
       this.listAuditLogs(2000),
       this.getSettings(),
+      this.listHomepageSlides(),
     ]);
 
     const notifications =
@@ -689,6 +798,7 @@ class DataStore {
         notifications,
         auditLogs,
         settings,
+        homepageSlides,
       },
     };
   }
@@ -714,6 +824,9 @@ class DataStore {
       await replaceCollection('notifications', d.notifications);
       await replaceCollection('auditLogs', d.auditLogs);
       if (d.settings) await this.saveSettings(d.settings);
+      if (Array.isArray(d.homepageSlides)) {
+        await replaceCollection('homepageSlides', d.homepageSlides);
+      }
       return;
     }
 
@@ -730,6 +843,9 @@ class DataStore {
       notifications: d.notifications,
       auditLogs: d.auditLogs,
       settings: d.settings,
+      homepageSlides: Array.isArray(d.homepageSlides)
+        ? d.homepageSlides
+        : this.devState.homepageSlides,
     };
     this.persistDev();
   }

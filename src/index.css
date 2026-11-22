@@ -4,11 +4,22 @@
   --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Official New Patriotic Party (NPP) Colours */
+  --color-npp-blue: #0b2b7e;
+  --color-npp-blue-dark: #071e5c;
+  --color-npp-blue-navy: #071a4d;
+  --color-npp-blue-soft: #eef3fc;
+  --color-npp-red: #d41118;
+  --color-npp-red-dark: #a60d13;
+  --color-npp-red-soft: #fdf2f2;
 }
 
 @layer base {
   html {
     font-family: var(--font-sans);
+    background-color: #f7f9fc;
+    color: #0e172a;
   }
 
   h1, h2, h3, .font-display {

@@ -88,18 +88,23 @@ export function PortalShell({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#F7F9FC] flex flex-col lg:flex-row">
       {/* Desktop Sidebar (260px) */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-30">
-        <div className="h-16 px-5 flex items-center gap-3 border-b border-slate-200">
+        <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
+          <div className="bg-[#D41118]" />
+          <div className="bg-white border-b border-slate-200/70" />
+          <div className="bg-[#0B2B7E]" />
+        </div>
+        <div className="h-15 px-5 flex items-center gap-3 border-b border-slate-200">
           <BrandMark size={28} />
-          <span className="font-display text-base font-semibold text-slate-900 whitespace-nowrap truncate">
+          <span className="font-display text-base font-semibold text-[#071A4D] whitespace-nowrap truncate">
             NPP Issue Portal
           </span>
         </div>
 
-        <div className="p-4 border-b border-slate-200 space-y-1">
-          <p className="text-xs font-semibold text-blue-800">{portalTitle}</p>
+        <div className="p-4 border-b border-slate-200 space-y-1 bg-[#EEF3FC]/40">
+          <p className="text-xs font-semibold text-[#B30E14]">{portalTitle}</p>
           <p className="text-sm font-medium text-slate-900 truncate">{user.fullName}</p>
           <p className="text-xs text-slate-500 truncate">{user.titleOrOffice}</p>
           <p className="text-xs text-slate-600 pt-1 leading-snug">{scopeSummary}</p>
@@ -146,7 +151,7 @@ export function PortalShell({
                 onClick={() => onTabChange(item.id)}
                 className={`w-full min-h-[44px] px-3.5 rounded-lg flex items-center justify-between text-sm font-medium transition-colors whitespace-nowrap ${
                   active
-                    ? 'bg-blue-50 text-blue-900'
+                    ? 'bg-[#EEF3FC] text-[#0B2B7E] font-semibold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
@@ -155,7 +160,7 @@ export function PortalShell({
                   <span>{item.label}</span>
                 </span>
                 {typeof item.badge === 'number' && item.badge > 0 && (
-                  <span className="text-xs font-mono tabular-nums font-semibold text-red-700">
+                  <span className="text-xs font-mono tabular-nums font-semibold text-[#D41118]">
                     {item.badge}
                   </span>
                 )}
@@ -187,54 +192,61 @@ export function PortalShell({
       {/* Main Column */}
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
         {/* Top Bar: 3 zones on desktop, compact 52px on mobile */}
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200 h-14 lg:h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="lg:hidden">
-              <BrandMark size={24} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">
-                {portalTitle}
-              </p>
-              <p className="hidden sm:block text-xs text-slate-500 truncate">
-                {USER_ROLE_LABELS[user.role]} · {scopeSummary}
-              </p>
-            </div>
+        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200">
+          <div className="lg:hidden grid grid-cols-3 h-1 w-full" aria-hidden="true">
+            <div className="bg-[#D41118]" />
+            <div className="bg-white border-b border-slate-200/70" />
+            <div className="bg-[#0B2B7E]" />
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {user.role === 'SUPER_ADMIN' && onSwitchWorkspace && (
-              <div className="lg:hidden flex items-center gap-1.5">
-                <select
-                  aria-label="Switch Portal View"
-                  value={effectiveLevel}
-                  onChange={(e) => onSwitchWorkspace(e.target.value as SuperAdminWorkspace)}
-                  className="min-h-[38px] rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800"
-                >
-                  <option value="POLLING_STATION">Station</option>
-                  <option value="CONSTITUENCY">Constituency</option>
-                  <option value="REGIONAL">Regional</option>
-                  <option value="NATIONAL">National</option>
-                  <option value="admin">Admin</option>
-                </select>
+          <div className="h-14 lg:h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="lg:hidden">
+                <BrandMark size={24} />
               </div>
-            )}
-            <button
-              type="button"
-              onClick={onNewIssue}
-              className="min-h-[40px] px-3.5 sm:px-4 rounded-lg bg-blue-800 text-white text-xs sm:text-sm font-medium hover:bg-blue-900 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <FilePlus2 className="w-4 h-4 shrink-0" />
-              <span>Report Concern</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
-              aria-label="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#071A4D] truncate">
+                  {portalTitle}
+                </p>
+                <p className="hidden sm:block text-xs text-slate-500 truncate">
+                  {USER_ROLE_LABELS[user.role]} · {scopeSummary}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {user.role === 'SUPER_ADMIN' && onSwitchWorkspace && (
+                <div className="lg:hidden flex items-center gap-1.5">
+                  <select
+                    aria-label="Switch Portal View"
+                    value={effectiveLevel}
+                    onChange={(e) => onSwitchWorkspace(e.target.value as SuperAdminWorkspace)}
+                    className="min-h-[38px] rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800"
+                  >
+                    <option value="POLLING_STATION">Station</option>
+                    <option value="CONSTITUENCY">Constituency</option>
+                    <option value="REGIONAL">Regional</option>
+                    <option value="NATIONAL">National</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onNewIssue}
+                className="min-h-[40px] px-3.5 sm:px-4 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+              >
+                <FilePlus2 className="w-4 h-4 shrink-0" />
+                <span>Report Concern</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -258,7 +270,7 @@ export function PortalShell({
               type="button"
               onClick={() => onTabChange(item.id)}
               className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 relative ${
-                active ? 'text-blue-800 font-semibold' : 'text-slate-500'
+                active ? 'text-[#0B2B7E] font-semibold' : 'text-slate-500'
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -266,7 +278,7 @@ export function PortalShell({
                 {item.shortLabel}
               </span>
               {typeof item.badge === 'number' && item.badge > 0 && (
-                <span className="absolute top-1.5 right-5 text-[10px] font-mono tabular-nums font-bold text-red-700">
+                <span className="absolute top-1.5 right-5 text-[10px] font-mono tabular-nums font-bold text-[#D41118]">
                   {item.badge}
                 </span>
               )}

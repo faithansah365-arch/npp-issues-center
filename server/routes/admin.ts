@@ -1,10 +1,14 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
+import multer from 'multer';
 import {
   USER_ROLE_LABELS,
   type AccountStatus,
   type CategoryRecord,
   type ConstituencyRecord,
+  type HomepageSlideRecord,
   type InviteRecord,
   type PollingStationRecord,
   type UserRecord,
@@ -28,6 +32,44 @@ export const adminRouter = express.Router();
 // Every Platform Admin endpoint requires authenticated session + MFA + SUPER_ADMIN role
 adminRouter.use(requireAuth);
 adminRouter.use(requireRole('SUPER_ADMIN'));
+
+const ALLOWED_SLIDE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const slideUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 4 * 1024 * 1024, // 4 MB max per homepage slider image
+    files: 1,
+  },
+});
+
+function validateImageMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  if (buffer.length < 4) return false;
+  if (mimeType === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimeType === 'image/png') {
+    return (
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47
+    );
+  }
+  if (mimeType === 'image/webp') {
+    return (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+  return false;
+}
+
+function toPublicSlide(s: HomepageSlideRecord) {
+  const { imageDataBase64: _omit, storageKey: _omitKey, ...rest } = s;
+  return rest;
+}
 
 async function getGeoMaps() {
   const [regions, constituencies, pollingStations] = await Promise.all([
@@ -740,3 +782,173 @@ adminRouter.post('/break-glass/issue/:id', async (req: AuthenticatedRequest, res
 
   res.json({ issue });
 });
+
+// Homepage Gallery Slider Management
+adminRouter.get('/slides', async (_req, res) => {
+  const slides = await store.listHomepageSlides();
+  res.json({ slides: slides.map(toPublicSlide) });
+});
+
+adminRouter.post(
+  '/slides',
+  slideUpload.single('image'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const actor = req.authUser!;
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: 'Select an image file (JPEG, PNG, or WEBP).' });
+        return;
+      }
+      if (!ALLOWED_SLIDE_MIME_TYPES.has(file.mimetype)) {
+        res.status(400).json({ error: 'Only JPEG, PNG, or WEBP images are supported.' });
+        return;
+      }
+      if (!validateImageMagicBytes(file.buffer, file.mimetype)) {
+        res.status(400).json({ error: 'Uploaded file failed image signature verification.' });
+        return;
+      }
+
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+      const caption = typeof req.body?.caption === 'string' ? req.body.caption.trim() : '';
+      if (title.length < 2 || title.length > 100) {
+        res.status(400).json({ error: 'Slide title must be between 2 and 100 characters.' });
+        return;
+      }
+      if (caption.length > 260) {
+        res.status(400).json({ error: 'Slide caption must be 260 characters or fewer.' });
+        return;
+      }
+
+      const slideId = `slide-${crypto.randomUUID()}`;
+      const ext =
+        file.mimetype === 'image/png' ? 'png' : file.mimetype === 'image/webp' ? 'webp' : 'jpg';
+      const storageKey = `${slideId}.${ext}`;
+      const slidesDir = path.join(config.uploadsDir, 'slides');
+      fs.mkdirSync(slidesDir, { recursive: true });
+      fs.writeFileSync(path.join(slidesDir, storageKey), file.buffer);
+
+      const existing = await store.listHomepageSlides();
+      const maxOrder = existing.reduce((max, item) => Math.max(max, item.sortOrder), 0);
+      const now = new Date().toISOString();
+
+      const slide: HomepageSlideRecord = {
+        id: slideId,
+        title,
+        caption,
+        imageUrl: `/api/meta/slides/${slideId}/image`,
+        storageKey,
+        mimeType: file.mimetype,
+        imageDataBase64:
+          store.getStorageMode() === 'mongodb_atlas' ? file.buffer.toString('base64') : null,
+        sortOrder: maxOrder + 1,
+        active: true,
+        uploadedByUserId: actor.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await store.saveHomepageSlide(slide);
+
+      await logAuditEvent({
+        actorUserId: actor.id,
+        actorName: actor.fullName,
+        actorRole: actor.role,
+        action: 'HOMEPAGE_SLIDE_ADDED',
+        targetType: 'HOMEPAGE_SLIDE',
+        targetId: slide.id,
+        severity: 'INFO',
+        details: `Added homepage slider image "${slide.title}".`,
+        ip: req.ip,
+      });
+
+      res.status(201).json({ slide: toPublicSlide(slide) });
+    } catch (err) {
+      console.error('[admin/slides POST]', err);
+      res.status(500).json({ error: 'Unable to upload homepage image.' });
+    }
+  },
+);
+
+adminRouter.patch('/slides/:id', async (req: AuthenticatedRequest, res) => {
+  const actor = req.authUser!;
+  const slide = await store.getHomepageSlideById(String(req.params.id));
+  if (!slide) {
+    res.status(404).json({ error: 'Homepage slide not found.' });
+    return;
+  }
+
+  const body = req.body ?? {};
+  if (typeof body.title === 'string') {
+    const trimmed = body.title.trim();
+    if (trimmed.length < 2 || trimmed.length > 100) {
+      res.status(400).json({ error: 'Slide title must be between 2 and 100 characters.' });
+      return;
+    }
+    slide.title = trimmed;
+  }
+  if (typeof body.caption === 'string') {
+    const trimmed = body.caption.trim();
+    if (trimmed.length > 260) {
+      res.status(400).json({ error: 'Slide caption must be 260 characters or fewer.' });
+      return;
+    }
+    slide.caption = trimmed;
+  }
+  if (typeof body.active === 'boolean') {
+    slide.active = body.active;
+  }
+  if (typeof body.sortOrder === 'number' && Number.isFinite(body.sortOrder)) {
+    slide.sortOrder = Math.floor(body.sortOrder);
+  }
+  slide.updatedAt = new Date().toISOString();
+
+  await store.saveHomepageSlide(slide);
+
+  await logAuditEvent({
+    actorUserId: actor.id,
+    actorName: actor.fullName,
+    actorRole: actor.role,
+    action: 'HOMEPAGE_SLIDE_UPDATED',
+    targetType: 'HOMEPAGE_SLIDE',
+    targetId: slide.id,
+    severity: 'INFO',
+    details: `Updated homepage slider image "${slide.title}" (active=${slide.active}, order=${slide.sortOrder}).`,
+    ip: req.ip,
+  });
+
+  res.json({ slide: toPublicSlide(slide) });
+});
+
+adminRouter.delete('/slides/:id', async (req: AuthenticatedRequest, res) => {
+  const actor = req.authUser!;
+  const slide = await store.getHomepageSlideById(String(req.params.id));
+  if (!slide) {
+    res.status(404).json({ error: 'Homepage slide not found.' });
+    return;
+  }
+
+  if (slide.storageKey) {
+    const filePath = path.join(config.uploadsDir, 'slides', path.basename(slide.storageKey));
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+  await store.deleteHomepageSlide(slide.id);
+
+  await logAuditEvent({
+    actorUserId: actor.id,
+    actorName: actor.fullName,
+    actorRole: actor.role,
+    action: 'HOMEPAGE_SLIDE_DELETED',
+    targetType: 'HOMEPAGE_SLIDE',
+    targetId: slide.id,
+    severity: 'INFO',
+    details: `Removed homepage slider image "${slide.title}".`,
+    ip: req.ip,
+  });
+
+  res.json({ success: true });
+});
+

@@ -387,3 +387,19 @@ export interface DashboardAnalytics {
     createdAt: string;
   }>;
 }
+
+export interface HomepageSlideRecord {
+  id: string;
+  title: string;
+  caption: string;
+  imageUrl: string;
+  storageKey?: string | null;
+  mimeType?: string | null;
+  imageDataBase64?: string | null;
+  sortOrder: number;
+  active: boolean;
+  uploadedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
