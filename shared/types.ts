@@ -183,6 +183,7 @@ export interface AttachmentMeta {
   mimeType: string;
   sizeBytes: number;
   storageKey: string;
+  dataBase64?: string | null;
   uploadedByUserId: string;
   uploadedByName: string;
   createdAt: string;

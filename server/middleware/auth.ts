@@ -25,7 +25,7 @@ export function setSessionCookie(res: Response, rawToken: string, maxAgeMs: numb
   res.cookie(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.isProd || config.appUrl.startsWith('https://'),
+    secure: config.isProd || config.isVercel || config.appUrl.startsWith('https://'),
     path: '/',
     maxAge: maxAgeMs,
   });
@@ -35,7 +35,7 @@ export function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE_NAME, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.isProd || config.appUrl.startsWith('https://'),
+    secure: config.isProd || config.isVercel || config.appUrl.startsWith('https://'),
     path: '/',
   });
 }
@@ -55,10 +55,21 @@ export function requireCsrf(req: Request, res: Response, next: NextFunction): vo
   const origin = req.get('origin');
   if (origin) {
     const allowedOrigins = new Set<string>([config.appUrl]);
+    if (process.env.VERCEL_URL) {
+      allowedOrigins.add(`https://${process.env.VERCEL_URL.trim()}`);
+    }
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      allowedOrigins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.trim()}`);
+    }
     const host = req.get('host');
     if (host) {
       allowedOrigins.add(`http://${host}`);
       allowedOrigins.add(`https://${host}`);
+    }
+    const forwardedHost = req.get('x-forwarded-host');
+    if (forwardedHost) {
+      allowedOrigins.add(`http://${forwardedHost}`);
+      allowedOrigins.add(`https://${forwardedHost}`);
     }
     if (!allowedOrigins.has(origin)) {
       res.status(403).json({ error: 'Request origin is not permitted.' });

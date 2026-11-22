@@ -37,8 +37,6 @@ interface PendingInviteMfa {
   expiresAtMs: number;
 }
 
-const pendingInviteMfa = new Map<string, PendingInviteMfa>();
-
 export const authRouter = express.Router();
 
 async function getGeoMaps() {
@@ -341,14 +339,14 @@ authRouter.post('/invite/:token/initiate-mfa', authRateLimiter, async (req, res)
     const otpauthUri = buildOtpAuthUri(user.email, totpSecret, 'NPP Issue Portal');
     const qrDataUrl = await QRCode.toDataURL(otpauthUri, { width: 220, margin: 1 });
 
-    const enrollmentToken = generateToken(24);
-    pendingInviteMfa.set(sha256(enrollmentToken), {
+    const payload: PendingInviteMfa = {
       inviteId: invite.id,
       userId: user.id,
       passwordHash,
       totpSecret,
       expiresAtMs: Date.now() + 15 * 60 * 1000,
-    });
+    };
+    const enrollmentToken = encryptText(JSON.stringify(payload));
 
     res.json({
       enrollmentToken,
@@ -376,10 +374,19 @@ authRouter.post('/invite/:token/complete', authRateLimiter, async (req, res) => 
       return;
     }
 
-    const enrollHash = sha256(enrollmentToken);
-    const pending = pendingInviteMfa.get(enrollHash);
-    if (!pending || pending.inviteId !== invite.id || pending.expiresAtMs < Date.now()) {
-      pendingInviteMfa.delete(enrollHash);
+    let pending: PendingInviteMfa | null = null;
+    try {
+      pending = JSON.parse(decryptText(enrollmentToken)) as PendingInviteMfa;
+    } catch {
+      pending = null;
+    }
+
+    if (
+      !pending ||
+      pending.inviteId !== invite.id ||
+      typeof pending.expiresAtMs !== 'number' ||
+      pending.expiresAtMs < Date.now()
+    ) {
       res.status(400).json({ error: 'MFA enrollment session expired. Please restart activation.' });
       return;
     }
@@ -395,8 +402,6 @@ authRouter.post('/invite/:token/complete', authRateLimiter, async (req, res) => 
       res.status(404).json({ error: 'User account not found.' });
       return;
     }
-
-    pendingInviteMfa.delete(enrollHash);
 
     const backup = generateBackupCodes(8);
     const now = new Date().toISOString();

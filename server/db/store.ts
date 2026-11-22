@@ -155,6 +155,8 @@ class DataStore {
   private mongoClient: MongoClient | null = null;
   private mongoDb: Db | null = null;
   private mode: 'mongodb_atlas' | 'local_dev' = 'local_dev';
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
   private devDbPath = path.join(config.dataDir, 'dev-store.json');
   private devState: DevDatabaseShape = {
     users: [],
@@ -175,6 +177,17 @@ class DataStore {
   };
 
   async init(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = this._performInit().catch((err) => {
+      this.initPromise = null;
+      throw err;
+    });
+    return this.initPromise;
+  }
+
+  private async _performInit(): Promise<void> {
     fs.mkdirSync(config.uploadsDir, { recursive: true });
     fs.mkdirSync(path.join(config.uploadsDir, 'slides'), { recursive: true });
 
@@ -192,15 +205,22 @@ class DataStore {
         this.mode = 'mongodb_atlas';
         await this.ensureMongoIndexes();
         await this.ensureBaseReferenceData();
+        this.initialized = true;
         console.log('[db] Connected to MongoDB Atlas.');
         return;
       } catch (err) {
         console.error('[db] MongoDB Atlas connection failed:', (err as Error).message);
         if (config.isProd) {
-          throw new Error('Failed to connect to MongoDB Atlas in production mode.');
+          throw new Error(
+            'Failed to connect to MongoDB Atlas in production mode. Verify MONGODB_URI and MongoDB Atlas Network Access (allow 0.0.0.0/0 for Vercel).',
+          );
         }
         console.warn('[db] Falling back to local development store because NODE_ENV is not production.');
       }
+    } else if (config.isVercel && config.isProd) {
+      console.warn(
+        '[db] MONGODB_URI is not set on Vercel production. Using ephemeral /tmp storage until MONGODB_URI is configured.',
+      );
     }
 
     fs.mkdirSync(config.dataDir, { recursive: true });
@@ -212,7 +232,8 @@ class DataStore {
     }
     this.mode = 'local_dev';
     await this.ensureBaseReferenceData();
-    console.log('[db] Using local development JSON store at data/dev-store.json (configure MONGODB_URI for MongoDB Atlas).');
+    this.initialized = true;
+    console.log(`[db] Using local development JSON store at ${this.devDbPath} (configure MONGODB_URI for MongoDB Atlas).`);
   }
 
   getStorageMode(): 'mongodb_atlas' | 'local_dev' {

@@ -8,6 +8,7 @@ import { setSessionCookie } from '../middleware/auth.ts';
 import { logAuditEvent } from '../security/audit.ts';
 import {
   buildOtpAuthUri,
+  decryptText,
   encryptText,
   generateBackupCodes,
   generateToken,
@@ -22,15 +23,12 @@ import {
 import { setupRateLimiter } from '../security/rateLimit.ts';
 
 interface PendingAdminBootstrap {
-  tokenHash: string;
   fullName: string;
   email: string;
   passwordHash: string;
   totpSecret: string;
   expiresAtMs: number;
 }
-
-const pendingBootstraps = new Map<string, PendingAdminBootstrap>();
 
 export const setupRouter = express.Router();
 
@@ -111,16 +109,14 @@ setupRouter.post('/first-admin/initiate', setupRateLimiter, async (req, res) => 
     const otpauthUri = buildOtpAuthUri(normalizedEmail, totpSecret, 'NPP Portal Admin');
     const qrDataUrl = await QRCode.toDataURL(otpauthUri, { width: 220, margin: 1 });
 
-    const setupToken = generateToken(24);
-    const tokenHash = sha256(setupToken);
-    pendingBootstraps.set(tokenHash, {
-      tokenHash,
+    const payload: PendingAdminBootstrap = {
       fullName: fullName.trim(),
       email: normalizedEmail,
       passwordHash,
       totpSecret,
       expiresAtMs: Date.now() + 10 * 60 * 1000,
-    });
+    };
+    const setupToken = encryptText(JSON.stringify(payload));
 
     res.json({
       setupToken,
@@ -148,10 +144,14 @@ setupRouter.post('/first-admin/complete', setupRateLimiter, async (req, res) => 
       return;
     }
 
-    const tokenHash = sha256(setupToken);
-    const pending = pendingBootstraps.get(tokenHash);
-    if (!pending || pending.expiresAtMs < Date.now()) {
-      pendingBootstraps.delete(tokenHash);
+    let pending: PendingAdminBootstrap | null = null;
+    try {
+      pending = JSON.parse(decryptText(setupToken)) as PendingAdminBootstrap;
+    } catch {
+      pending = null;
+    }
+
+    if (!pending || typeof pending.expiresAtMs !== 'number' || pending.expiresAtMs < Date.now()) {
       res.status(400).json({ error: 'Setup session expired. Please restart first-admin setup.' });
       return;
     }
@@ -161,8 +161,6 @@ setupRouter.post('/first-admin/complete', setupRateLimiter, async (req, res) => 
       res.status(400).json({ error: 'Invalid 6-digit authenticator code. Please try again.' });
       return;
     }
-
-    pendingBootstraps.delete(tokenHash);
 
     const backup = generateBackupCodes(8);
     const now = new Date().toISOString();

@@ -91,6 +91,16 @@ function isOverdue(issue: IssueRecord, todayIso: string): boolean {
   return Boolean(issue.followUpDate && issue.followUpDate < todayIso);
 }
 
+function toPublicIssue(issue: IssueRecord): IssueRecord {
+  if (!issue.attachments.some((att) => att.dataBase64)) {
+    return issue;
+  }
+  return {
+    ...issue,
+    attachments: issue.attachments.map(({ dataBase64: _omit, ...rest }) => rest),
+  };
+}
+
 function filterScopedIssues(
   allIssues: IssueRecord[],
   user: UserRecord,
@@ -163,7 +173,7 @@ issuesRouter.get('/', async (req: AuthenticatedRequest, res) => {
 
   res.json({
     issues: filtered.map((issue) => ({
-      ...issue,
+      ...toPublicIssue(issue),
       isOverdue: isOverdue(issue, todayIso),
     })),
     total: filtered.length,
@@ -500,6 +510,8 @@ issuesRouter.post(
           mimeType: req.file.mimetype,
           sizeBytes: req.file.size,
           storageKey,
+          dataBase64:
+            store.getStorageMode() === 'mongodb_atlas' ? req.file.buffer.toString('base64') : null,
           uploadedByUserId: actor.id,
           uploadedByName: actor.fullName,
           createdAt: new Date().toISOString(),
@@ -614,7 +626,7 @@ issuesRouter.post(
         `A ${issue.priority}${issue.isEssential ? ' Essential' : ''} concern was submitted from ${issue.pollingStationName}.`,
       );
 
-      res.status(201).json({ issue });
+      res.status(201).json({ issue: toPublicIssue(issue) });
     } catch (err) {
       console.error('[issues/post]', err);
       res.status(500).json({ error: 'Unable to submit issue report.' });
@@ -695,7 +707,7 @@ issuesRouter.get('/:id', async (req: AuthenticatedRequest, res) => {
     : null;
 
   res.json({
-    issue,
+    issue: toPublicIssue(issue),
     suggestions,
     recurringGroup,
   });
@@ -956,7 +968,7 @@ issuesRouter.patch('/:id', async (req: AuthenticatedRequest, res) => {
     );
   }
 
-  res.json({ issue });
+  res.json({ issue: toPublicIssue(issue) });
 });
 
 issuesRouter.post('/:id/escalate', async (req: AuthenticatedRequest, res) => {
@@ -1082,7 +1094,7 @@ issuesRouter.post('/:id/escalate', async (req: AuthenticatedRequest, res) => {
     `Your report "${issue.title}" has been escalated to ${nextLevel} level.`,
   );
 
-  res.json({ issue });
+  res.json({ issue: toPublicIssue(issue) });
 });
 
 issuesRouter.post('/:id/resolve', async (req: AuthenticatedRequest, res) => {
@@ -1158,7 +1170,7 @@ issuesRouter.post('/:id/resolve', async (req: AuthenticatedRequest, res) => {
     `Outcome recorded for "${issue.title}": ${summary}`,
   );
 
-  res.json({ issue });
+  res.json({ issue: toPublicIssue(issue) });
 });
 
 issuesRouter.post('/:id/close', async (req: AuthenticatedRequest, res) => {
@@ -1234,7 +1246,7 @@ issuesRouter.post('/:id/close', async (req: AuthenticatedRequest, res) => {
     `"${issue.title}" was closed. Reason: ${reason}`,
   );
 
-  res.json({ issue });
+  res.json({ issue: toPublicIssue(issue) });
 });
 
 issuesRouter.get('/:id/attachments/:attId', async (req: AuthenticatedRequest, res) => {
@@ -1255,14 +1267,20 @@ issuesRouter.get('/:id/attachments/:attId', async (req: AuthenticatedRequest, re
     return;
   }
 
-  const filePath = path.resolve(config.uploadsDir, path.basename(att.storageKey));
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: 'Attachment file unavailable on server storage.' });
-    return;
-  }
-
   res.setHeader('Content-Type', att.mimeType);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', `attachment; filename="${sanitizeFilename(att.originalName)}"`);
-  fs.createReadStream(filePath).pipe(res);
+
+  const filePath = path.resolve(config.uploadsDir, path.basename(att.storageKey));
+  if (fs.existsSync(filePath)) {
+    fs.createReadStream(filePath).pipe(res);
+    return;
+  }
+
+  if (att.dataBase64) {
+    res.send(Buffer.from(att.dataBase64, 'base64'));
+    return;
+  }
+
+  res.status(404).json({ error: 'Attachment file unavailable on server storage.' });
 });

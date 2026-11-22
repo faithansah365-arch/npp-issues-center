@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
@@ -7,11 +8,23 @@ dotenv.config();
 const runtimeFallbackSessionSecret = crypto.randomBytes(32).toString('hex');
 const runtimeFallbackEncryptionKey = crypto.randomBytes(32).toString('hex');
 
+const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+const inferredAppUrl =
+  (process.env.APP_URL || '').trim() ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.trim()}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL.trim()}`
+      : 'http://localhost:3000');
+
+const writableBaseDir = isVercel ? os.tmpdir() : process.cwd();
+
 export const config = {
   port: Number(process.env.PORT || 3000),
   nodeEnv: process.env.NODE_ENV || 'development',
   isProd: process.env.NODE_ENV === 'production',
-  appUrl: (process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, ''),
+  isVercel,
+  appUrl: inferredAppUrl.replace(/\/+$/, ''),
   mongodbUri: (process.env.MONGODB_URI || '').trim(),
   sessionSecret: (process.env.SESSION_SECRET || '').trim() || runtimeFallbackSessionSecret,
   hasPersistentSessionSecret: Boolean((process.env.SESSION_SECRET || '').trim()),
@@ -26,8 +39,8 @@ export const config = {
     pass: (process.env.SMTP_PASS || '').trim(),
     from: (process.env.SMTP_FROM || 'NPP Issue Portal <no-reply@example.org>').trim(),
   },
-  dataDir: path.resolve(process.cwd(), 'data'),
-  uploadsDir: path.resolve(process.cwd(), 'uploads'),
+  dataDir: path.resolve(writableBaseDir, isVercel ? 'npp-portal-data' : 'data'),
+  uploadsDir: path.resolve(writableBaseDir, isVercel ? 'npp-portal-uploads' : 'uploads'),
 };
 
 export function isSmtpConfigured(): boolean {
