@@ -44,6 +44,145 @@ setupRouter.get('/status', async (_req, res) => {
   });
 });
 
+setupRouter.post('/first-admin', setupRateLimiter, async (req, res) => {
+  try {
+    const users = await store.listUsers();
+    const existingAdmin = users.find((u) => u.role === 'SUPER_ADMIN' && u.status === 'ACTIVE');
+    if (existingAdmin) {
+      res.status(409).json({
+        error: 'A Super Admin account already exists. Public bootstrap is permanently disabled.',
+      });
+      return;
+    }
+
+    if (!config.bootstrapAdminSecret) {
+      res.status(503).json({
+        error:
+          'BOOTSTRAP_ADMIN_SECRET is not configured on the server. Set BOOTSTRAP_ADMIN_SECRET in server environment variables or run npm run bootstrap-admin.',
+      });
+      return;
+    }
+
+    const { bootstrapSecret, fullName, email, password } = req.body ?? {};
+    if (
+      typeof bootstrapSecret !== 'string' ||
+      !safeEqualStrings(bootstrapSecret.trim(), config.bootstrapAdminSecret)
+    ) {
+      await logAuditEvent({
+        actorUserId: null,
+        actorName: String(email || 'Unknown'),
+        actorRole: 'ANONYMOUS',
+        action: 'BOOTSTRAP_ADMIN_DENIED',
+        targetType: 'SYSTEM',
+        severity: 'CRITICAL',
+        details: 'Invalid BOOTSTRAP_ADMIN_SECRET supplied during first-admin setup attempt.',
+        ip: req.ip,
+      });
+      res.status(403).json({ error: 'Invalid server bootstrap secret.' });
+      return;
+    }
+
+    if (typeof fullName !== 'string' || fullName.trim().length < 3) {
+      res.status(400).json({ error: 'Full name must be at least 3 characters.' });
+      return;
+    }
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      res.status(400).json({ error: 'Provide a valid administrator email address.' });
+      return;
+    }
+
+    const pwdError = validatePasswordStrength(password);
+    if (pwdError) {
+      res.status(400).json({ error: pwdError });
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingEmail = await store.getUserByEmail(normalizedEmail);
+    if (existingEmail) {
+      res.status(409).json({ error: 'An account with this email already exists.' });
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+    const now = new Date().toISOString();
+    const adminId = crypto.randomUUID();
+
+    const adminUser: UserRecord = {
+      id: adminId,
+      fullName: fullName.trim(),
+      email: normalizedEmail,
+      titleOrOffice: 'Platform Super Administrator',
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      regionId: null,
+      constituencyId: null,
+      pollingStationId: null,
+      passwordHash,
+      mfaEnabled: false,
+      mfaSecretEncrypted: null,
+      mfaBackupCodeHashes: [],
+      lastTotpStepUsed: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: now,
+      invitedByUserId: null,
+      approvedByUserId: adminId,
+      approvedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await store.saveUser(adminUser);
+
+    const settings = await store.getSettings();
+    const maxHours = settings?.sessionMaxHours ?? 12;
+    const idleMinutes = settings?.sessionIdleMinutes ?? 45;
+    const rawSessionToken = generateToken(32);
+
+    await store.saveSession({
+      id: crypto.randomUUID(),
+      userId: adminId,
+      tokenHash: sha256(rawSessionToken),
+      mfaVerified: false,
+      expiresAt: new Date(Date.now() + maxHours * 3600 * 1000).toISOString(),
+      idleExpiresAt: new Date(Date.now() + idleMinutes * 60 * 1000).toISOString(),
+      revokedAt: null,
+      ipHash: hashIp(req.ip || ''),
+      userAgentSummary: String(req.get('user-agent') || '').slice(0, 120),
+      createdAt: now,
+      lastSeenAt: now,
+    });
+
+    setSessionCookie(res, rawSessionToken, maxHours * 3600 * 1000);
+
+    await logAuditEvent({
+      actorUserId: adminId,
+      actorName: adminUser.fullName,
+      actorRole: 'SUPER_ADMIN',
+      action: 'FIRST_SUPER_ADMIN_CREATED',
+      targetType: 'USER',
+      targetId: adminId,
+      severity: 'CRITICAL',
+      details: `First Super Admin account (${adminUser.email}) provisioned.`,
+      ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      user: {
+        id: adminUser.id,
+        fullName: adminUser.fullName,
+        email: adminUser.email,
+        role: adminUser.role,
+      },
+    });
+  } catch (err) {
+    console.error('[setup/first-admin]', err);
+    res.status(500).json({ error: 'Unable to complete Super Admin setup.' });
+  }
+});
+
 setupRouter.post('/first-admin/initiate', setupRateLimiter, async (req, res) => {
   try {
     const users = await store.listUsers();

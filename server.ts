@@ -17,8 +17,18 @@ async function startServer() {
   } else {
     const distDir = path.resolve(process.cwd(), 'dist');
     if (fs.existsSync(distDir)) {
-      app.use(express.static(distDir));
+      app.use(
+        express.static(distDir, {
+          maxAge: '1y',
+          setHeaders(res, filePath) {
+            if (filePath.endsWith('sw.js') || filePath.endsWith('index.html') || filePath.endsWith('manifest.webmanifest')) {
+              res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+            }
+          },
+        }),
+      );
       app.get('*', (_req, res) => {
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
         res.sendFile(path.join(distDir, 'index.html'));
       });
     }

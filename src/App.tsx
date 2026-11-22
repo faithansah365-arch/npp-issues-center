@@ -1,20 +1,47 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import type { IssueLevel } from '../shared/types';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { AuthScreen } from './components/AuthScreen';
-import { ExecutiveDashboard } from './components/ExecutiveDashboard';
-import { IssueDetailDrawer } from './components/IssueDetailDrawer';
-import { IssueFormModal } from './components/IssueFormModal';
-import { IssueList } from './components/IssueList';
-import { NotificationsView } from './components/NotificationsView';
-import { PlatformAdminPortal } from './components/PlatformAdminPortal';
-import {
-  PortalShell,
-  type ExecutiveTab,
-  type SuperAdminWorkspace,
-} from './components/PortalShell';
-import { RecurringConcernsView } from './components/RecurringConcernsView';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import type { ExecutiveTab, SuperAdminWorkspace } from './components/PortalShell';
 import { EMPTY_FILTERS, type IssueFilterState } from './lib/filters';
+
+const AuthScreen = lazy(() =>
+  import('./components/AuthScreen').then((m) => ({ default: m.AuthScreen })),
+);
+const PlatformAdminPortal = lazy(() =>
+  import('./components/PlatformAdminPortal').then((m) => ({ default: m.PlatformAdminPortal })),
+);
+const PortalShell = lazy(() =>
+  import('./components/PortalShell').then((m) => ({ default: m.PortalShell })),
+);
+const ExecutiveDashboard = lazy(() =>
+  import('./components/ExecutiveDashboard').then((m) => ({ default: m.ExecutiveDashboard })),
+);
+const IssueList = lazy(() =>
+  import('./components/IssueList').then((m) => ({ default: m.IssueList })),
+);
+const RecurringConcernsView = lazy(() =>
+  import('./components/RecurringConcernsView').then((m) => ({
+    default: m.RecurringConcernsView,
+  })),
+);
+const NotificationsView = lazy(() =>
+  import('./components/NotificationsView').then((m) => ({ default: m.NotificationsView })),
+);
+const IssueFormModal = lazy(() =>
+  import('./components/IssueFormModal').then((m) => ({ default: m.IssueFormModal })),
+);
+const IssueDetailDrawer = lazy(() =>
+  import('./components/IssueDetailDrawer').then((m) => ({ default: m.IssueDetailDrawer })),
+);
+
+function RouteLoader({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center p-6 text-xs font-medium text-[#071A4D]/80">
+      {label}
+    </div>
+  );
+}
 
 function AppRouter() {
   const { user, loading } = useAuth();
@@ -43,22 +70,34 @@ function AppRouter() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-6 text-sm text-[#071A4D]">
+      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-6 text-sm font-medium text-[#071A4D]">
         Loading NPP Internal Issue Portal…
       </div>
     );
   }
 
   if (isAdminRoute && (!user || user.role !== 'SUPER_ADMIN')) {
-    return <PlatformAdminPortal />;
+    return (
+      <Suspense fallback={<RouteLoader label="Loading Platform Admin…" />}>
+        <PlatformAdminPortal />
+      </Suspense>
+    );
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <Suspense fallback={<RouteLoader label="Loading NPP Portal…" />}>
+        <AuthScreen />
+      </Suspense>
+    );
   }
 
   if (user.role === 'SUPER_ADMIN' && adminWorkspace === 'admin') {
-    return <PlatformAdminPortal onSwitchWorkspace={handleSwitchWorkspace} />;
+    return (
+      <Suspense fallback={<RouteLoader label="Loading Platform Admin…" />}>
+        <PlatformAdminPortal onSwitchWorkspace={handleSwitchWorkspace} />
+      </Suspense>
+    );
   }
 
   const effectiveLevel: IssueLevel | undefined =
@@ -70,7 +109,7 @@ function AppRouter() {
   }
 
   return (
-    <>
+    <Suspense fallback={<RouteLoader label="Loading Executive Portal…" />}>
       <PortalShell
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -78,60 +117,70 @@ function AppRouter() {
         portalLevelOverride={effectiveLevel}
         onSwitchWorkspace={user.role === 'SUPER_ADMIN' ? handleSwitchWorkspace : undefined}
       >
-        {activeTab === 'dashboard' && (
-          <ExecutiveDashboard
-            filters={filters}
-            onFiltersChange={setFilters}
-            onSelectIssue={(id) => setSelectedIssueId(id)}
-            onNavigateQueue={handleNavigateQueue}
-            refreshKey={refreshKey}
-            effectiveLevel={effectiveLevel}
-          />
-        )}
+        <Suspense fallback={<RouteLoader />}>
+          {activeTab === 'dashboard' && (
+            <ExecutiveDashboard
+              filters={filters}
+              onFiltersChange={setFilters}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onNavigateQueue={handleNavigateQueue}
+              refreshKey={refreshKey}
+              effectiveLevel={effectiveLevel}
+            />
+          )}
 
-        {activeTab === 'issues' && (
-          <IssueList
-            filters={filters}
-            onFiltersChange={setFilters}
-            onSelectIssue={(id) => setSelectedIssueId(id)}
-            onNewIssue={() => setCreateOpen(true)}
-            refreshKey={refreshKey}
-            effectiveLevel={effectiveLevel}
-          />
-        )}
+          {activeTab === 'issues' && (
+            <IssueList
+              filters={filters}
+              onFiltersChange={setFilters}
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              onNewIssue={() => setCreateOpen(true)}
+              refreshKey={refreshKey}
+              effectiveLevel={effectiveLevel}
+            />
+          )}
 
-        {activeTab === 'recurring' && (
-          <RecurringConcernsView
-            onSelectIssue={(id) => setSelectedIssueId(id)}
-            refreshKey={refreshKey}
-          />
-        )}
+          {activeTab === 'recurring' && (
+            <RecurringConcernsView
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              refreshKey={refreshKey}
+            />
+          )}
 
-        {activeTab === 'notifications' && (
-          <NotificationsView
-            onSelectIssue={(id) => setSelectedIssueId(id)}
-            refreshKey={refreshKey}
-          />
-        )}
+          {activeTab === 'notifications' && (
+            <NotificationsView
+              onSelectIssue={(id) => setSelectedIssueId(id)}
+              refreshKey={refreshKey}
+            />
+          )}
+        </Suspense>
       </PortalShell>
 
-      <IssueFormModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        effectiveLevel={effectiveLevel}
-        onCreated={(issue) => {
-          setRefreshKey((k) => k + 1);
-          setSelectedIssueId(issue.id);
-        }}
-      />
+      {createOpen && (
+        <Suspense fallback={null}>
+          <IssueFormModal
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            effectiveLevel={effectiveLevel}
+            onCreated={(issue) => {
+              setRefreshKey((k) => k + 1);
+              setSelectedIssueId(issue.id);
+            }}
+          />
+        </Suspense>
+      )}
 
-      <IssueDetailDrawer
-        issueId={selectedIssueId}
-        onClose={() => setSelectedIssueId(null)}
-        onMutated={() => setRefreshKey((k) => k + 1)}
-        onOpenIssue={(id) => setSelectedIssueId(id)}
-      />
-    </>
+      {selectedIssueId && (
+        <Suspense fallback={null}>
+          <IssueDetailDrawer
+            issueId={selectedIssueId}
+            onClose={() => setSelectedIssueId(null)}
+            onMutated={() => setRefreshKey((k) => k + 1)}
+            onOpenIssue={(id) => setSelectedIssueId(id)}
+          />
+        </Suspense>
+      )}
+    </Suspense>
   );
 }
 
@@ -139,6 +188,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppRouter />
+      <OfflineIndicator />
     </AuthProvider>
   );
 }

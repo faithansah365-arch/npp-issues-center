@@ -107,17 +107,17 @@ export async function requireAuth(
     return;
   }
 
-  if (!session.mfaVerified) {
-    res.status(401).json({ error: 'Multi-factor authentication verification required.' });
-    return;
-  }
-
   const user = await store.getUserById(session.userId);
-  if (!user || user.status !== 'ACTIVE' || !user.mfaEnabled) {
+  if (!user || user.status !== 'ACTIVE') {
     session.revokedAt = new Date().toISOString();
     await store.saveSession(session);
     clearSessionCookie(res);
-    res.status(403).json({ error: 'Account is not active or MFA is not enabled.' });
+    res.status(403).json({ error: 'Account is not active or is awaiting administrator approval.' });
+    return;
+  }
+
+  if (user.mfaEnabled && !session.mfaVerified) {
+    res.status(401).json({ error: 'Multi-factor authentication verification required.' });
     return;
   }
 

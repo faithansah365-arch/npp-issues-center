@@ -6,6 +6,7 @@ export type UserRole =
   | 'SUPER_ADMIN';
 
 export type AccountStatus =
+  | 'PENDING_APPROVAL'
   | 'INVITED'
   | 'ACTIVE'
   | 'SUSPENDED'

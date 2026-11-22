@@ -36,6 +36,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { BrandMark } from './BrandMark';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SetupStatus {
   hasSuperAdmin: boolean;
@@ -59,6 +60,7 @@ interface AdminOverview {
   counts: {
     totalUsers: number;
     activeUsers: number;
+    pendingApprovals: number;
     pendingInvites: number;
     suspendedUsers: number;
     activeCategories: number;
@@ -79,25 +81,17 @@ export function PlatformAdminPortal({
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
 
-  // Bootstrap state
+  // Bootstrap state (direct Super Admin creation without MFA for now)
   const [bootSecret, setBootSecret] = useState('');
   const [bootName, setBootName] = useState('');
   const [bootEmail, setBootEmail] = useState('');
   const [bootPassword, setBootPassword] = useState('');
-  const [bootStep2, setBootStep2] = useState<{
-    setupToken: string;
-    qrDataUrl: string;
-    manualSecret: string;
-  } | null>(null);
-  const [bootTotp, setBootTotp] = useState('');
-  const [bootBackupCodes, setBootBackupCodes] = useState<string[] | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [bootSubmitting, setBootSubmitting] = useState(false);
 
   // Admin Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [loginTotp, setLoginTotp] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
 
@@ -125,9 +119,11 @@ export function PlatformAdminPortal({
   const [editSlideTitle, setEditSlideTitle] = useState('');
   const [editSlideCaption, setEditSlideCaption] = useState('');
 
-  // Invite form
+  // Enroll / Invite form
+  const [enrollMode, setEnrollMode] = useState<'enroll' | 'invite'>('enroll');
   const [invName, setInvName] = useState('');
   const [invEmail, setInvEmail] = useState('');
+  const [invPassword, setInvPassword] = useState('');
   const [invTitle, setInvTitle] = useState('');
   const [invRole, setInvRole] = useState<UserRole>('POLLING_STATION');
   const [invRegionId, setInvRegionId] = useState('');
@@ -213,16 +209,12 @@ export function PlatformAdminPortal({
     }
   }, [user]);
 
-  async function handleBootstrapStep1(e: React.FormEvent) {
+  async function handleBootstrapSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBootError(null);
     setBootSubmitting(true);
     try {
-      const res = await apiRequest<{
-        setupToken: string;
-        qrDataUrl: string;
-        manualSecret: string;
-      }>('/api/setup/first-admin/initiate', {
+      await apiRequest('/api/setup/first-admin', {
         method: 'POST',
         body: {
           bootstrapSecret: bootSecret,
@@ -231,28 +223,8 @@ export function PlatformAdminPortal({
           password: bootPassword,
         },
       });
-      setBootStep2(res);
-    } catch (err) {
-      setBootError((err as Error).message);
-    } finally {
-      setBootSubmitting(false);
-    }
-  }
-
-  async function handleBootstrapStep2(e: React.FormEvent) {
-    e.preventDefault();
-    if (!bootStep2) return;
-    setBootError(null);
-    setBootSubmitting(true);
-    try {
-      const res = await apiRequest<{ backupCodes: string[] }>('/api/setup/first-admin/complete', {
-        method: 'POST',
-        body: {
-          setupToken: bootStep2.setupToken,
-          totpCode: bootTotp,
-        },
-      });
-      setBootBackupCodes(res.backupCodes);
+      loadSetupStatus();
+      await refreshSession();
     } catch (err) {
       setBootError((err as Error).message);
     } finally {
@@ -270,7 +242,6 @@ export function PlatformAdminPortal({
         body: {
           email: loginEmail,
           password: loginPassword,
-          totpCode: loginTotp,
         },
       });
       await refreshSession();
@@ -281,12 +252,41 @@ export function PlatformAdminPortal({
     }
   }
 
-  async function handleInviteUser(e: React.FormEvent) {
+  async function handleEnrollOrInviteUser(e: React.FormEvent) {
     e.preventDefault();
     setAdminError(null);
     setAdminFeedback(null);
     setLastIssuedLink(null);
     try {
+      if (enrollMode === 'enroll') {
+        const res = await apiRequest<{
+          user: PublicUser;
+          emailSent: boolean;
+          emailStatusNote: string;
+        }>('/api/admin/users/enroll', {
+          method: 'POST',
+          body: {
+            fullName: invName,
+            email: invEmail,
+            password: invPassword,
+            titleOrOffice: invTitle,
+            role: invRole,
+            regionId: invRegionId || null,
+            constituencyId: invConstituencyId || null,
+            pollingStationId: invStationId || null,
+          },
+        });
+        setAdminFeedback(
+          `Enrolled and activated ${res.user.fullName} (${res.user.email}) as ${USER_ROLE_LABELS[res.user.role]}.`,
+        );
+        setInvName('');
+        setInvEmail('');
+        setInvPassword('');
+        setInvTitle('');
+        await loadAdminData();
+        return;
+      }
+
       const res = await apiRequest<{
         user: PublicUser;
         inviteUrl: string;
@@ -659,7 +659,7 @@ export function PlatformAdminPortal({
                   <code className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded">
                     BOOTSTRAP_ADMIN_SECRET
                   </code>{' '}
-                  in your server environment (or Secrets panel), restart the server, then refresh this page to complete web setup with TOTP MFA.
+                  in your server environment (or Secrets panel), restart the server, then refresh this page to create your Super Admin account.
                 </li>
                 <li>
                   <strong>Server CLI:</strong> Run{' '}
@@ -678,38 +678,8 @@ export function PlatformAdminPortal({
                 <span>Re-check Server Status</span>
               </button>
             </div>
-          ) : bootBackupCodes ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-4 space-y-2 text-xs text-emerald-100">
-                <p className="font-semibold text-sm">Super Admin Activated</p>
-                <p>
-                  Save these single-use recovery backup codes offline, and remove{' '}
-                  <code className="font-mono">BOOTSTRAP_ADMIN_SECRET</code> from your server environment.
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  {bootBackupCodes.map((c) => (
-                    <code
-                      key={c}
-                      className="bg-slate-950 border border-emerald-700/50 rounded px-2 py-1.5 text-center font-mono text-white"
-                    >
-                      {c}
-                    </code>
-                  ))}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  loadSetupStatus();
-                  void refreshSession();
-                }}
-                className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
-              >
-                Enter Platform Admin Console
-              </button>
-            </div>
-          ) : !bootStep2 ? (
-            <form onSubmit={handleBootstrapStep1} className="space-y-4">
+          ) : (
+            <form onSubmit={handleBootstrapSubmit} className="space-y-4">
               {bootError && (
                 <div className="rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-xs text-red-200">
                   {bootError}
@@ -764,47 +734,7 @@ export function PlatformAdminPortal({
                 disabled={bootSubmitting}
                 className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
               >
-                {bootSubmitting ? 'Preparing MFA…' : 'Continue to Mandatory MFA Setup'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleBootstrapStep2} className="space-y-4">
-              {bootError && (
-                <div className="rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-xs text-red-200">
-                  {bootError}
-                </div>
-              )}
-              <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-[#06153F] border border-white/15">
-                <img
-                  src={bootStep2.qrDataUrl}
-                  alt="Super Admin MFA QR Code"
-                  className="w-44 h-44 bg-white p-2 rounded-lg"
-                />
-                <p className="text-xs text-white/75 text-center">
-                  Scan in your authenticator app or enter key:{' '}
-                  <span className="font-mono text-white break-all">{bootStep2.manualSecret}</span>
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs text-white/85 mb-1">
-                  6-Digit Authenticator Code
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  required
-                  value={bootTotp}
-                  onChange={(e) => setBootTotp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 font-mono text-sm tracking-widest text-white"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={bootSubmitting}
-                className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
-              >
-                {bootSubmitting ? 'Activating…' : 'Verify & Create Super Admin'}
+                {bootSubmitting ? 'Creating Super Admin…' : 'Create Super Admin & Sign In'}
               </button>
             </form>
           )}
@@ -834,7 +764,7 @@ export function PlatformAdminPortal({
                 Platform Administration Sign In
               </h1>
               <p className="text-xs text-white/75">
-                Restricted to authorized Super Administrators with MFA
+                Restricted to authorized Platform Super Administrators
               </p>
             </div>
           </div>
@@ -866,26 +796,12 @@ export function PlatformAdminPortal({
                 className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
               />
             </div>
-            <div>
-              <label className="block text-xs text-white/85 mb-1">
-                6-Digit Authenticator Code
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                required
-                value={loginTotp}
-                onChange={(e) => setLoginTotp(e.target.value.replace(/\D/g, ''))}
-                className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 font-mono text-sm tracking-widest text-white"
-              />
-            </div>
             <button
               type="submit"
               disabled={loginSubmitting}
               className="w-full min-h-[46px] rounded-lg bg-[#D41118] hover:bg-[#B30E14] text-white text-sm font-medium"
             >
-              {loginSubmitting ? 'Verifying…' : 'Sign In to Platform Admin'}
+              {loginSubmitting ? 'Signing in…' : 'Sign In to Platform Admin'}
             </button>
           </form>
           </div>
@@ -934,6 +850,8 @@ export function PlatformAdminPortal({
     ? constituencies.filter((c) => c.regionId === newPsRegionId)
     : [];
 
+  const pendingApprovalUsers = users.filter((u) => u.status === 'PENDING_APPROVAL');
+
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
       <header className="bg-[#071A4D] text-white border-b border-[#0B2B7E]">
@@ -954,14 +872,17 @@ export function PlatformAdminPortal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="min-h-[40px] px-3.5 rounded-lg bg-white/10 hover:bg-[#D41118] text-xs font-medium text-white inline-flex items-center gap-2 whitespace-nowrap shrink-0 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <PWAInstallButton variant="dark-header" />
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="min-h-[40px] px-3.5 rounded-lg bg-white/10 hover:bg-[#D41118] text-xs font-medium text-white inline-flex items-center gap-2 whitespace-nowrap shrink-0 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
+          </div>
         </div>
 
         {/* Direct Access to All Four Executive Portals */}
@@ -1006,7 +927,13 @@ export function PlatformAdminPortal({
           {[
             { id: 'overview', label: 'Readiness & Backups' },
             { id: 'gallery', label: 'Homepage Images' },
-            { id: 'users', label: 'Accounts & Scopes' },
+            {
+              id: 'users',
+              label:
+                pendingApprovalUsers.length > 0
+                  ? `Accounts & Approvals (${pendingApprovalUsers.length})`
+                  : 'Accounts & Scopes',
+            },
             { id: 'taxonomy', label: 'Categories & Geography' },
             { id: 'settings', label: 'Privacy & Retention' },
             { id: 'audit', label: 'Security & Audit Logs' },
@@ -1059,7 +986,7 @@ export function PlatformAdminPortal({
                   {overview.counts.activeUsers}
                 </p>
                 <p className="text-xs text-slate-500 mt-1 tabular-nums">
-                  {overview.counts.pendingInvites} invited · {overview.counts.suspendedUsers} suspended
+                  {overview.counts.pendingApprovals} awaiting approval · {overview.counts.pendingInvites} invited
                 </p>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-5">
@@ -1208,12 +1135,12 @@ export function PlatformAdminPortal({
                       <img
                         src={slidePreviewUrl}
                         alt="New slide preview"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center"
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-xs text-slate-600 gap-2">
                         <Upload className="w-5 h-5 text-[#0B2B7E]" />
-                        <span>Click to choose JPEG, PNG, or WEBP (max 4 MB)</span>
+                        <span>Click to choose JPEG, PNG, or WEBP (auto-fits homepage frame)</span>
                       </div>
                     )}
                     <input
@@ -1420,18 +1347,106 @@ export function PlatformAdminPortal({
           </div>
         )}
 
-        {/* TAB 2: ACCOUNTS & SCOPES */}
+        {/* TAB 2: ACCOUNTS, APPROVALS & ENROLLMENT */}
         {activeTab === 'users' && (
           <div className="space-y-6">
+            {/* Pending Sign-Up Approvals Queue */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold text-[#071A4D]">
+                    Pending Sign-Up Approvals ({pendingApprovalUsers.length})
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Anyone who signs up must be approved here before they can enter the portal.
+                  </p>
+                </div>
+              </div>
+              {pendingApprovalUsers.length === 0 ? (
+                <p className="p-5 text-xs text-slate-500">
+                  No sign-up requests are currently awaiting approval.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {pendingApprovalUsers.map((pending) => (
+                    <div
+                      key={pending.id}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-0.5 text-xs">
+                        <p className="font-semibold text-slate-900 text-sm">{pending.fullName}</p>
+                        <p className="text-slate-600">
+                          {pending.email} · {pending.titleOrOffice}
+                        </p>
+                        <p className="text-slate-700 font-medium">
+                          Requested Level: {USER_ROLE_LABELS[pending.role]} ·{' '}
+                          {[
+                            pending.pollingStationName,
+                            pending.constituencyName,
+                            pending.regionName,
+                          ]
+                            .filter(Boolean)
+                            .join(', ') || 'National'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => void handleUserStatusChange(pending.id, 'ACTIVE')}
+                          className="min-h-[38px] px-4 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
+                        >
+                          Approve Access
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleUserStatusChange(pending.id, 'DEACTIVATED')}
+                          className="min-h-[38px] px-3.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-800 text-xs font-medium"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Direct Enrollment or Activation Invite */}
             <form
-              onSubmit={handleInviteUser}
+              onSubmit={handleEnrollOrInviteUser}
               className="bg-white border border-slate-200 rounded-xl p-5 space-y-4"
             >
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-[#0B2B7E]" />
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Invite & Approve Executive or Admin Account
-                </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-[#0B2B7E]" />
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Enroll or Invite Executive / Admin Account
+                  </h2>
+                </div>
+                <div className="inline-flex p-1 rounded-lg bg-slate-100 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEnrollMode('enroll')}
+                    className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                      enrollMode === 'enroll'
+                        ? 'bg-white text-[#071A4D] shadow-xs'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    Enroll Directly (Active Now)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnrollMode('invite')}
+                    className={`px-3 py-1.5 rounded-md font-medium transition-colors ${
+                      enrollMode === 'invite'
+                        ? 'bg-white text-[#071A4D] shadow-xs'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    Send Invite Link
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -1451,6 +1466,16 @@ export function PlatformAdminPortal({
                   onChange={(e) => setInvEmail(e.target.value)}
                   className="min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
                 />
+                {enrollMode === 'enroll' && (
+                  <input
+                    type="password"
+                    required
+                    placeholder="Initial Password (min 12 chars, Aa1!)"
+                    value={invPassword}
+                    onChange={(e) => setInvPassword(e.target.value)}
+                    className="min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                )}
                 <input
                   type="text"
                   placeholder="Party Office / Title (e.g. Constituency Secretary)"
@@ -1569,7 +1594,9 @@ export function PlatformAdminPortal({
                   type="submit"
                   className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs font-medium"
                 >
-                  Create Approved Invitation
+                  {enrollMode === 'enroll'
+                    ? 'Enroll & Activate Account'
+                    : 'Create Approved Invitation'}
                 </button>
               </div>
             </form>
@@ -1581,7 +1608,7 @@ export function PlatformAdminPortal({
                     <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-medium">
                       <th className="py-3 px-4">Executive / Admin</th>
                       <th className="py-3 px-4">Role & Jurisdiction</th>
-                      <th className="py-3 px-4">Status & MFA</th>
+                      <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Actions</th>
                     </tr>
                   </thead>
@@ -1601,12 +1628,31 @@ export function PlatformAdminPortal({
                           </p>
                         </td>
                         <td className="py-3 px-4">
-                          <p className="font-medium text-slate-800">
-                            {u.status} · MFA {u.mfaEnabled ? 'Enabled' : 'Pending'}
-                          </p>
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded font-medium ${
+                              u.status === 'ACTIVE'
+                                ? 'bg-emerald-50 text-emerald-800'
+                                : u.status === 'PENDING_APPROVAL'
+                                  ? 'bg-amber-50 text-amber-900'
+                                  : u.status === 'INVITED'
+                                    ? 'bg-blue-50 text-blue-900'
+                                    : 'bg-red-50 text-red-800'
+                            }`}
+                          >
+                            {u.status === 'PENDING_APPROVAL' ? 'Awaiting Approval' : u.status}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-2">
+                            {u.status === 'PENDING_APPROVAL' && (
+                              <button
+                                type="button"
+                                onClick={() => void handleUserStatusChange(u.id, 'ACTIVE')}
+                                className="px-2.5 py-1.5 rounded bg-[#0B2B7E] text-white font-medium hover:bg-[#071E5C]"
+                              >
+                                Approve
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => void handleReissueLink(u)}
@@ -1638,7 +1684,7 @@ export function PlatformAdminPortal({
                                 onClick={() => void handleUserStatusChange(u.id, 'DEACTIVATED')}
                                 className="px-2.5 py-1.5 rounded border border-red-300 bg-red-50 text-red-800"
                               >
-                                Deactivate
+                                {u.status === 'PENDING_APPROVAL' ? 'Decline' : 'Deactivate'}
                               </button>
                             )}
                             <button

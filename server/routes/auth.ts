@@ -1,7 +1,12 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import QRCode from 'qrcode';
-import { USER_ROLE_LABELS, type UserRole } from '../../shared/types.ts';
+import {
+  USER_ROLE_LABELS,
+  type PollingStationRecord,
+  type UserRecord,
+  type UserRole,
+} from '../../shared/types.ts';
 import { store } from '../db/store.ts';
 import {
   clearSessionCookie,
@@ -28,6 +33,7 @@ import {
 } from '../security/crypto.ts';
 import { authRateLimiter } from '../security/rateLimit.ts';
 import { sendTransactionalEmail } from '../services/email.ts';
+import { dispatchNotification } from '../services/notifications.ts';
 
 interface PendingInviteMfa {
   inviteId: string;
@@ -116,16 +122,18 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
       });
       res.status(403).json({
         error:
-          user.status === 'INVITED'
-            ? 'Your invitation has not been activated yet. Open your invitation link to set your password and MFA.'
-            : 'This account is suspended or deactivated. Contact a Platform Super Admin.',
+          user.status === 'PENDING_APPROVAL'
+            ? 'Your account is awaiting administrator approval before you can enter the portal.'
+            : user.status === 'INVITED'
+              ? 'Your invitation has not been activated yet. Open your invitation link to set your password.'
+              : 'This account is suspended or deactivated. Contact a Platform Super Admin.',
       });
       return;
     }
 
-    if (!user.passwordHash || !user.mfaEnabled || !user.mfaSecretEncrypted) {
+    if (!user.passwordHash) {
       res.status(403).json({
-        error: 'Account security setup is incomplete. Use your invitation or MFA reset link.',
+        error: 'Account password setup is incomplete. Use your invitation or password reset link.',
       });
       return;
     }
@@ -151,53 +159,55 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
         ip: req.ip,
       });
 
-      res.status(401).json({ error: 'Invalid credentials or multi-factor code.' });
+      res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
 
-    // Verify TOTP or single-use backup code
-    let mfaOk = false;
+    // Verify TOTP or single-use backup code only if MFA is enabled for this account
     let matchedStep: number | null = null;
+    if (user.mfaEnabled && user.mfaSecretEncrypted) {
+      let mfaOk = false;
 
-    if (typeof totpCode === 'string' && totpCode.trim().length > 0) {
-      const secret = decryptText(user.mfaSecretEncrypted);
-      const check = verifyTotpCode(secret, totpCode, user.lastTotpStepUsed);
-      if (check.valid) {
-        mfaOk = true;
-        matchedStep = check.matchedStep;
+      if (typeof totpCode === 'string' && totpCode.trim().length > 0) {
+        const secret = decryptText(user.mfaSecretEncrypted);
+        const check = verifyTotpCode(secret, totpCode, user.lastTotpStepUsed);
+        if (check.valid) {
+          mfaOk = true;
+          matchedStep = check.matchedStep;
+        }
+      } else if (typeof backupCode === 'string' && backupCode.trim().length > 0) {
+        const normalizedBackup = backupCode.trim().toUpperCase();
+        const candidateHash = sha256(normalizedBackup);
+        const idx = user.mfaBackupCodeHashes.indexOf(candidateHash);
+        if (idx >= 0) {
+          mfaOk = true;
+          user.mfaBackupCodeHashes.splice(idx, 1);
+        }
       }
-    } else if (typeof backupCode === 'string' && backupCode.trim().length > 0) {
-      const normalizedBackup = backupCode.trim().toUpperCase();
-      const candidateHash = sha256(normalizedBackup);
-      const idx = user.mfaBackupCodeHashes.indexOf(candidateHash);
-      if (idx >= 0) {
-        mfaOk = true;
-        user.mfaBackupCodeHashes.splice(idx, 1);
+
+      if (!mfaOk) {
+        user.failedLoginAttempts += 1;
+        if (user.failedLoginAttempts >= 5) {
+          user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        }
+        user.updatedAt = new Date().toISOString();
+        await store.saveUser(user);
+
+        await logAuditEvent({
+          actorUserId: user.id,
+          actorName: user.fullName,
+          actorRole: user.role,
+          action: 'LOGIN_FAILED_MFA',
+          targetType: 'USER',
+          targetId: user.id,
+          severity: 'WARNING',
+          details: 'Password succeeded but MFA verification failed.',
+          ip: req.ip,
+        });
+
+        res.status(401).json({ error: 'Invalid credentials or multi-factor code.' });
+        return;
       }
-    }
-
-    if (!mfaOk) {
-      user.failedLoginAttempts += 1;
-      if (user.failedLoginAttempts >= 5) {
-        user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      }
-      user.updatedAt = new Date().toISOString();
-      await store.saveUser(user);
-
-      await logAuditEvent({
-        actorUserId: user.id,
-        actorName: user.fullName,
-        actorRole: user.role,
-        action: 'LOGIN_FAILED_MFA',
-        targetType: 'USER',
-        targetId: user.id,
-        severity: 'WARNING',
-        details: 'Password succeeded but MFA verification failed.',
-        ip: req.ip,
-      });
-
-      res.status(401).json({ error: 'Invalid credentials or multi-factor code.' });
-      return;
     }
 
     const now = new Date().toISOString();
@@ -219,7 +229,7 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
       id: crypto.randomUUID(),
       userId: user.id,
       tokenHash: sha256(rawSessionToken),
-      mfaVerified: true,
+      mfaVerified: Boolean(user.mfaEnabled),
       expiresAt: new Date(Date.now() + maxHours * 3600 * 1000).toISOString(),
       idleExpiresAt: new Date(Date.now() + idleMinutes * 60 * 1000).toISOString(),
       revokedAt: null,
@@ -291,6 +301,181 @@ authRouter.post('/logout', async (req, res) => {
   res.json({ success: true });
 });
 
+authRouter.post('/register', authRateLimiter, async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const titleOrOffice = typeof body.titleOrOffice === 'string' ? body.titleOrOffice.trim() : '';
+    const role: UserRole = body.role;
+    const regionId = typeof body.regionId === 'string' && body.regionId ? body.regionId : null;
+    const constituencyId =
+      typeof body.constituencyId === 'string' && body.constituencyId ? body.constituencyId : null;
+    let pollingStationId =
+      typeof body.pollingStationId === 'string' && body.pollingStationId
+        ? body.pollingStationId
+        : null;
+    const customPollingStationName =
+      typeof body.customPollingStationName === 'string'
+        ? body.customPollingStationName.trim()
+        : '';
+
+    if (fullName.length < 3) {
+      res.status(400).json({ error: 'Full name must be at least 3 characters.' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Provide a valid email address.' });
+      return;
+    }
+
+    const pwdError = validatePasswordStrength(password);
+    if (pwdError) {
+      res.status(400).json({ error: pwdError });
+      return;
+    }
+
+    if (!['POLLING_STATION', 'CONSTITUENCY', 'REGIONAL', 'NATIONAL'].includes(role)) {
+      res.status(400).json({ error: 'Select a valid executive level.' });
+      return;
+    }
+
+    const [regions, constituencies, pollingStations] = await Promise.all([
+      store.listRegions(),
+      store.listConstituencies(),
+      store.listPollingStations(),
+    ]);
+
+    if (role !== 'NATIONAL') {
+      if (!regionId || !regions.some((r) => r.id === regionId)) {
+        res.status(400).json({ error: 'Select a valid region.' });
+        return;
+      }
+    }
+
+    if (role === 'CONSTITUENCY' || role === 'POLLING_STATION') {
+      const con = constituencies.find((c) => c.id === constituencyId && c.regionId === regionId);
+      if (!con) {
+        res.status(400).json({ error: 'Select a valid constituency within the chosen region.' });
+        return;
+      }
+    }
+
+    if (role === 'POLLING_STATION') {
+      if (pollingStationId) {
+        const ps = pollingStations.find(
+          (p) => p.id === pollingStationId && p.constituencyId === constituencyId,
+        );
+        if (!ps) {
+          res.status(400).json({ error: 'Select a valid polling station.' });
+          return;
+        }
+      } else if (customPollingStationName.length >= 2 && regionId && constituencyId) {
+        const existingMatch = pollingStations.find(
+          (p) =>
+            p.constituencyId === constituencyId &&
+            p.name.toLowerCase() === customPollingStationName.toLowerCase(),
+        );
+        if (existingMatch) {
+          pollingStationId = existingMatch.id;
+        } else {
+          const newStation: PollingStationRecord = {
+            id: `ps-${crypto.randomBytes(4).toString('hex')}`,
+            regionId,
+            constituencyId,
+            name: customPollingStationName,
+            code: `PS-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+          };
+          await store.savePollingStation(newStation);
+          pollingStationId = newStation.id;
+        }
+      } else {
+        res.status(400).json({
+          error: 'Select a polling station or enter your polling station name.',
+        });
+        return;
+      }
+    }
+
+    const existing = await store.getUserByEmail(email);
+    if (existing) {
+      res.status(409).json({
+        error:
+          existing.status === 'PENDING_APPROVAL'
+            ? 'A registration for this email is already awaiting administrator approval.'
+            : 'An account with this email already exists.',
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const passwordHash = await hashPassword(password);
+    const user: UserRecord = {
+      id: crypto.randomUUID(),
+      fullName,
+      email,
+      titleOrOffice: titleOrOffice || USER_ROLE_LABELS[role],
+      role,
+      status: 'PENDING_APPROVAL',
+      regionId: role === 'NATIONAL' ? null : regionId,
+      constituencyId: role === 'POLLING_STATION' || role === 'CONSTITUENCY' ? constituencyId : null,
+      pollingStationId: role === 'POLLING_STATION' ? pollingStationId : null,
+      passwordHash,
+      mfaEnabled: false,
+      mfaSecretEncrypted: null,
+      mfaBackupCodeHashes: [],
+      lastTotpStepUsed: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
+      invitedByUserId: null,
+      approvedByUserId: null,
+      approvedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await store.saveUser(user);
+
+    await logAuditEvent({
+      actorUserId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'USER_SIGNUP_PENDING_APPROVAL',
+      targetType: 'USER',
+      targetId: user.id,
+      severity: 'INFO',
+      details: `${user.email} signed up as ${USER_ROLE_LABELS[role]} and awaits administrator approval.`,
+      ip: req.ip,
+    });
+
+    const admins = (await store.listUsers()).filter(
+      (u) => u.role === 'SUPER_ADMIN' && u.status === 'ACTIVE',
+    );
+    await Promise.all(
+      admins.map((admin) =>
+        dispatchNotification({
+          recipient: admin,
+          issue: null,
+          eventType: 'SECURITY_ALERT',
+          title: `Account approval requested: ${user.fullName}`,
+          message: `${user.fullName} (${user.email}) signed up for ${USER_ROLE_LABELS[role]} access and requires Super Admin approval.`,
+        }),
+      ),
+    );
+
+    res.status(201).json({
+      success: true,
+      message:
+        'Registration submitted. An administrator must approve your account before you can sign in.',
+    });
+  } catch (err) {
+    console.error('[auth/register]', err);
+    res.status(500).json({ error: 'Unable to submit registration.' });
+  }
+});
+
 authRouter.get('/invite/:token', authRateLimiter, async (req, res) => {
   const token = String(req.params.token || '');
   const invite = await store.getInviteByTokenHash(sha256(token));
@@ -310,6 +495,87 @@ authRouter.get('/invite/:token', authRateLimiter, async (req, res) => {
     user: toPublicUser(user, geo),
     expiresAt: invite.expiresAt,
   });
+});
+
+authRouter.post('/invite/:token/activate', authRateLimiter, async (req, res) => {
+  try {
+    const token = String(req.params.token || '');
+    const invite = await store.getInviteByTokenHash(sha256(token));
+    if (!invite || invite.usedAt || Date.parse(invite.expiresAt) <= Date.now()) {
+      res.status(404).json({ error: 'Invitation link is invalid or has expired.' });
+      return;
+    }
+
+    const user = await store.getUserById(invite.userId);
+    if (!user || user.status === 'SUSPENDED' || user.status === 'DEACTIVATED') {
+      res.status(403).json({ error: 'Invited account is not eligible for activation.' });
+      return;
+    }
+
+    const { password } = req.body ?? {};
+    const pwdError = validatePasswordStrength(password);
+    if (pwdError) {
+      res.status(400).json({ error: pwdError });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    user.passwordHash = await hashPassword(password);
+    user.mfaEnabled = false;
+    user.mfaSecretEncrypted = null;
+    user.mfaBackupCodeHashes = [];
+    user.status = 'ACTIVE';
+    user.approvedAt = user.approvedAt || now;
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+    user.lastLoginAt = now;
+    user.updatedAt = now;
+    await store.saveUser(user);
+
+    invite.usedAt = now;
+    await store.saveInvite(invite);
+
+    const settings = await store.getSettings();
+    const maxHours = settings?.sessionMaxHours ?? 12;
+    const idleMinutes = settings?.sessionIdleMinutes ?? 45;
+    const rawSessionToken = generateToken(32);
+
+    await store.saveSession({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      tokenHash: sha256(rawSessionToken),
+      mfaVerified: false,
+      expiresAt: new Date(Date.now() + maxHours * 3600 * 1000).toISOString(),
+      idleExpiresAt: new Date(Date.now() + idleMinutes * 60 * 1000).toISOString(),
+      revokedAt: null,
+      ipHash: hashIp(req.ip || ''),
+      userAgentSummary: String(req.get('user-agent') || '').slice(0, 120),
+      createdAt: now,
+      lastSeenAt: now,
+    });
+
+    setSessionCookie(res, rawSessionToken, maxHours * 3600 * 1000);
+
+    await logAuditEvent({
+      actorUserId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'INVITE_ACCEPTED_ACTIVATED',
+      targetType: 'USER',
+      targetId: user.id,
+      severity: 'INFO',
+      details: `Invited account activated (${USER_ROLE_LABELS[user.role]}).`,
+      ip: req.ip,
+    });
+
+    const geo = await getGeoMaps();
+    res.json({
+      user: toPublicUser(user, geo),
+    });
+  } catch (err) {
+    console.error('[invite/activate]', err);
+    res.status(500).json({ error: 'Unable to complete account activation.' });
+  }
 });
 
 authRouter.post('/invite/:token/initiate-mfa', authRateLimiter, async (req, res) => {
@@ -529,8 +795,8 @@ authRouter.post('/password-reset/request', authRateLimiter, async (req, res) => 
 authRouter.post('/password-reset/confirm', authRateLimiter, async (req, res) => {
   try {
     const { token, newPassword, totpCode } = req.body ?? {};
-    if (typeof token !== 'string' || typeof newPassword !== 'string' || typeof totpCode !== 'string') {
-      res.status(400).json({ error: 'Reset token, new password, and 6-digit MFA code are required.' });
+    if (typeof token !== 'string' || typeof newPassword !== 'string') {
+      res.status(400).json({ error: 'Reset token and new password are required.' });
       return;
     }
 
@@ -541,8 +807,8 @@ authRouter.post('/password-reset/confirm', authRateLimiter, async (req, res) => 
     }
 
     const user = await store.getUserById(reset.userId);
-    if (!user || user.status !== 'ACTIVE' || !user.mfaSecretEncrypted) {
-      res.status(403).json({ error: 'Account is not active or MFA is not configured.' });
+    if (!user || user.status !== 'ACTIVE') {
+      res.status(403).json({ error: 'Account is not active.' });
       return;
     }
 
@@ -552,16 +818,26 @@ authRouter.post('/password-reset/confirm', authRateLimiter, async (req, res) => 
       return;
     }
 
-    const secret = decryptText(user.mfaSecretEncrypted);
-    const mfaCheck = verifyTotpCode(secret, totpCode, user.lastTotpStepUsed);
-    if (!mfaCheck.valid) {
-      res.status(401).json({ error: 'Invalid 6-digit authenticator code.' });
-      return;
+    let matchedStep: number | null = null;
+    if (user.mfaEnabled && user.mfaSecretEncrypted) {
+      if (typeof totpCode !== 'string' || !totpCode.trim()) {
+        res.status(400).json({ error: '6-digit authenticator code is required for this account.' });
+        return;
+      }
+      const secret = decryptText(user.mfaSecretEncrypted);
+      const mfaCheck = verifyTotpCode(secret, totpCode, user.lastTotpStepUsed);
+      if (!mfaCheck.valid) {
+        res.status(401).json({ error: 'Invalid 6-digit authenticator code.' });
+        return;
+      }
+      matchedStep = mfaCheck.matchedStep;
     }
 
     const now = new Date().toISOString();
     user.passwordHash = await hashPassword(newPassword);
-    user.lastTotpStepUsed = mfaCheck.matchedStep;
+    if (matchedStep !== null) {
+      user.lastTotpStepUsed = matchedStep;
+    }
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
     user.updatedAt = now;
@@ -580,7 +856,7 @@ authRouter.post('/password-reset/confirm', authRateLimiter, async (req, res) => 
       targetType: 'USER',
       targetId: user.id,
       severity: 'INFO',
-      details: 'Password reset confirmed with MFA verification; prior sessions revoked.',
+      details: 'Password reset confirmed; prior sessions revoked.',
       ip: req.ip,
     });
 

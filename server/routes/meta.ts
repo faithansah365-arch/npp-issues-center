@@ -45,6 +45,15 @@ metaRouter.get('/slides/:id/image', async (req, res) => {
   res.status(404).json({ error: 'Slide image bytes unavailable.' });
 });
 
+metaRouter.get('/public-geography', async (_req, res) => {
+  const [regions, constituencies, pollingStations] = await Promise.all([
+    store.listRegions(),
+    store.listConstituencies(),
+    store.listPollingStations(),
+  ]);
+  res.json({ regions, constituencies, pollingStations });
+});
+
 metaRouter.get('/privacy', async (_req, res) => {
   const settings = await store.getSettings();
   res.json({

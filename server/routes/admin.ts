@@ -23,7 +23,12 @@ import {
   type AuthenticatedRequest,
 } from '../middleware/auth.ts';
 import { logAuditEvent } from '../security/audit.ts';
-import { generateToken, sha256 } from '../security/crypto.ts';
+import {
+  generateToken,
+  hashPassword,
+  sha256,
+  validatePasswordStrength,
+} from '../security/crypto.ts';
 import { sendTransactionalEmail } from '../services/email.ts';
 import { dispatchNotification } from '../services/notifications.ts';
 
@@ -119,6 +124,7 @@ adminRouter.get('/overview', async (_req, res) => {
     ]);
 
   const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
+  const pendingApprovals = users.filter((u) => u.status === 'PENDING_APPROVAL').length;
   const pendingInvites = users.filter((u) => u.status === 'INVITED').length;
   const suspendedUsers = users.filter((u) => u.status === 'SUSPENDED').length;
 
@@ -143,6 +149,7 @@ adminRouter.get('/overview', async (_req, res) => {
     counts: {
       totalUsers: users.length,
       activeUsers,
+      pendingApprovals,
       pendingInvites,
       suspendedUsers,
       activeCategories: categories.filter((c) => c.active).length,
@@ -250,7 +257,7 @@ adminRouter.post('/users/invite', async (req: AuthenticatedRequest, res) => {
     const emailRes = await sendTransactionalEmail({
       to: user.email,
       subject: '[NPP Issue Portal] Authorized Executive Invitation',
-      text: `You have been invited as ${USER_ROLE_LABELS[role]} on the NPP Internal Issue Resolution Portal.\n\nComplete your password setup and mandatory authenticator MFA enrollment within 72 hours:\n${inviteUrl}\n`,
+      text: `You have been invited as ${USER_ROLE_LABELS[role]} on the NPP Internal Issue Resolution Portal.\n\nComplete your password setup within 72 hours:\n${inviteUrl}\n`,
     });
 
     await logAuditEvent({
@@ -279,6 +286,115 @@ adminRouter.post('/users/invite', async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Direct Admin Enrollment (immediately ACTIVE, no MFA required right now)
+adminRouter.post('/users/enroll', async (req: AuthenticatedRequest, res) => {
+  try {
+    const actor = req.authUser!;
+    const body = req.body ?? {};
+
+    const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const titleOrOffice = typeof body.titleOrOffice === 'string' ? body.titleOrOffice.trim() : '';
+    const role: UserRole = body.role;
+    const regionId = typeof body.regionId === 'string' && body.regionId ? body.regionId : null;
+    const constituencyId =
+      typeof body.constituencyId === 'string' && body.constituencyId ? body.constituencyId : null;
+    const pollingStationId =
+      typeof body.pollingStationId === 'string' && body.pollingStationId
+        ? body.pollingStationId
+        : null;
+
+    if (fullName.length < 3) {
+      res.status(400).json({ error: 'Full name must be at least 3 characters.' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Provide a valid email address.' });
+      return;
+    }
+    const pwdError = validatePasswordStrength(password);
+    if (pwdError) {
+      res.status(400).json({ error: pwdError });
+      return;
+    }
+    if (!Object.keys(USER_ROLE_LABELS).includes(role)) {
+      res.status(400).json({ error: 'Select a valid account role.' });
+      return;
+    }
+
+    const scopeErr = validateRoleScope({ role, regionId, constituencyId, pollingStationId });
+    if (scopeErr) {
+      res.status(400).json({ error: scopeErr });
+      return;
+    }
+
+    const existing = await store.getUserByEmail(email);
+    if (existing) {
+      res.status(409).json({ error: 'An account with this email already exists.' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const userId = crypto.randomUUID();
+    const user: UserRecord = {
+      id: userId,
+      fullName,
+      email,
+      titleOrOffice: titleOrOffice || USER_ROLE_LABELS[role],
+      role,
+      status: 'ACTIVE',
+      regionId: role === 'NATIONAL' || role === 'SUPER_ADMIN' ? null : regionId,
+      constituencyId: role === 'POLLING_STATION' || role === 'CONSTITUENCY' ? constituencyId : null,
+      pollingStationId: role === 'POLLING_STATION' ? pollingStationId : null,
+      passwordHash: await hashPassword(password),
+      mfaEnabled: false,
+      mfaSecretEncrypted: null,
+      mfaBackupCodeHashes: [],
+      lastTotpStepUsed: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
+      invitedByUserId: actor.id,
+      approvedByUserId: actor.id,
+      approvedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await store.saveUser(user);
+
+    const loginUrl = `${req.protocol}://${req.get('host')}/`;
+    const emailRes = await sendTransactionalEmail({
+      to: user.email,
+      subject: '[NPP Issue Portal] Account Enrolled & Approved',
+      text: `You have been enrolled as ${USER_ROLE_LABELS[role]} on the NPP Internal Issue Resolution Portal.\n\nSign in at: ${loginUrl}\nEmail: ${user.email}`,
+    });
+
+    await logAuditEvent({
+      actorUserId: actor.id,
+      actorName: actor.fullName,
+      actorRole: actor.role,
+      action: 'USER_DIRECTLY_ENROLLED',
+      targetType: 'USER',
+      targetId: user.id,
+      severity: role === 'SUPER_ADMIN' || role === 'NATIONAL' ? 'CRITICAL' : 'INFO',
+      details: `Directly enrolled ${user.email} as ${role} (ACTIVE).`,
+      ip: req.ip,
+    });
+
+    const geo = await getGeoMaps();
+    res.status(201).json({
+      user: toPublicUser(user, geo),
+      emailSent: emailRes.sent,
+      emailStatusNote: emailRes.reason,
+    });
+  } catch (err) {
+    console.error('[admin/users/enroll]', err);
+    res.status(500).json({ error: 'Unable to enroll account.' });
+  }
+});
+
 adminRouter.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
   const actor = req.authUser!;
   const target = await store.getUserById(String(req.params.id));
@@ -290,6 +406,7 @@ adminRouter.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
   const body = req.body ?? {};
   const now = new Date().toISOString();
   const changes: string[] = [];
+  const wasPendingApproval = target.status === 'PENDING_APPROVAL';
 
   if (body.status && ['ACTIVE', 'SUSPENDED', 'DEACTIVATED'].includes(body.status)) {
     if (target.id === actor.id && body.status !== 'ACTIVE') {
@@ -362,11 +479,19 @@ adminRouter.patch('/users/:id', async (req: AuthenticatedRequest, res) => {
   target.updatedAt = now;
   await store.saveUser(target);
 
+  if (wasPendingApproval && target.status === 'ACTIVE') {
+    await sendTransactionalEmail({
+      to: target.email,
+      subject: '[NPP Issue Portal] Account Approved',
+      text: `Your executive account (${USER_ROLE_LABELS[target.role]}) on the NPP Internal Issue Resolution Portal has been approved by an administrator. You may now sign in.`,
+    });
+  }
+
   await logAuditEvent({
     actorUserId: actor.id,
     actorName: actor.fullName,
     actorRole: actor.role,
-    action: 'USER_PERMISSIONS_UPDATED',
+    action: wasPendingApproval && target.status === 'ACTIVE' ? 'USER_SIGNUP_APPROVED' : 'USER_PERMISSIONS_UPDATED',
     targetType: 'USER',
     targetId: target.id,
     severity: 'CRITICAL',
@@ -840,7 +965,9 @@ adminRouter.post(
         storageKey,
         mimeType: file.mimetype,
         imageDataBase64:
-          store.getStorageMode() === 'mongodb_atlas' ? file.buffer.toString('base64') : null,
+          store.getStorageMode() === 'mongodb_atlas' || config.isVercel
+            ? file.buffer.toString('base64')
+            : null,
         sortOrder: maxOrder + 1,
         active: true,
         uploadedByUserId: actor.id,

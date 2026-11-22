@@ -20,15 +20,53 @@
     font-family: var(--font-sans);
     background-color: #f7f9fc;
     color: #0e172a;
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
   }
+
+  button, a, select, input, textarea, label {
+    touch-action: manipulation;
+  }
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes nppTileAssemble {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--tile-x, 0px), var(--tile-y, 0px), 0) scale(0.45);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.npp-tile-assemble {
+  will-change: transform, opacity;
+  animation: nppTileAssemble 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes nppBaseFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.npp-base-fade {
+  animation: nppBaseFadeIn 0.35s ease 0.42s both;
+}
+
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @media (prefers-reduced-motion: reduce) {

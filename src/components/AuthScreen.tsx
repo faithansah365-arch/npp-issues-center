@@ -6,19 +6,23 @@ import {
   Eye,
   EyeOff,
   Image as ImageIcon,
-  KeyRound,
   LogIn,
+  UserPlus,
   X,
 } from 'lucide-react';
 import {
   USER_ROLE_LABELS,
+  type ConstituencyRecord,
   type HomepageSlideRecord,
+  type PollingStationRecord,
   type PublicUser,
+  type RegionRecord,
   type UserRole,
 } from '../../shared/types';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { BrandMark } from './BrandMark';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SetupStatus {
   hasSuperAdmin: boolean;
@@ -27,6 +31,48 @@ interface SetupStatus {
   smtpConfigured: boolean;
 }
 
+const DEFAULT_FALLBACK_SLIDES: HomepageSlideRecord[] = [
+  {
+    id: 'slide-default-1',
+    title: 'Development in Freedom',
+    caption:
+      'New Patriotic Party delegates, organizers, and leadership working together across all 16 regions of Ghana.',
+    imageUrl: '/assets/slides/npp_civic_assembly_1795358498204.jpg',
+    mimeType: 'image/jpeg',
+    sortOrder: 1,
+    active: true,
+    uploadedByUserId: null,
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'slide-default-2',
+    title: 'Coordinated Executive Leadership',
+    caption:
+      'Polling-station, constituency, regional, and national executives reviewing community priorities and action plans.',
+    imageUrl: '/assets/slides/npp_executive_forum_1795358497409.jpg',
+    mimeType: 'image/jpeg',
+    sortOrder: 2,
+    active: true,
+    uploadedByUserId: null,
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'slide-default-3',
+    title: 'Rooted in Every Constituency',
+    caption:
+      'Listening to citizens across all 276 parliamentary constituencies and turning local concerns into timely action.',
+    imageUrl: '/assets/slides/npp_community_outreach_1795358498035.jpg',
+    mimeType: 'image/jpeg',
+    sortOrder: 3,
+    active: true,
+    uploadedByUserId: null,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
 const PARTY_LEVELS = [
   { num: '01', name: 'Polling Station', detail: 'Community & branch-level meeting concerns' },
   { num: '02', name: 'Constituency', detail: '276 constituencies coordinating local resolution' },
@@ -34,21 +80,112 @@ const PARTY_LEVELS = [
   { num: '04', name: 'National', detail: 'National executive oversight across Ghana' },
 ];
 
+const GRID_COLS = 6;
+const GRID_ROWS = 4;
+const MOSAIC_CELLS = Array.from({ length: GRID_COLS * GRID_ROWS }, (_, index) => {
+  const row = Math.floor(index / GRID_COLS);
+  const col = index % GRID_COLS;
+  const centerCol = (GRID_COLS - 1) / 2;
+  const centerRow = (GRID_ROWS - 1) / 2;
+  const dx = col - centerCol;
+  const dy = row - centerRow;
+  const dist = Math.hypot(dx, dy);
+  return {
+    id: `${row}-${col}`,
+    row,
+    col,
+    tileX: `${Math.round(dx * 18)}px`,
+    tileY: `${Math.round(dy * 14)}px`,
+    delayMs: Math.round((col * 0.032 + row * 0.042 + dist * 0.02) * 1000),
+  };
+});
+
+function MosaicHeroImage({
+  slide,
+  broken,
+  onError,
+}: {
+  slide: HomepageSlideRecord;
+  broken: boolean;
+  onError: () => void;
+}) {
+  if (broken) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-[#071A4D] via-[#0B2B7E] to-[#7F0B10] flex items-center justify-center">
+        <ImageIcon className="w-12 h-12 text-white/40" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-[#071A4D] via-[#0B2B7E] to-[#7F0B10]">
+      {/* Primary fitted hero image settles after mosaic tiles finish assembling */}
+      <img
+        key={`base-${slide.id}`}
+        src={slide.imageUrl}
+        alt={slide.title}
+        onError={onError}
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
+        className="relative w-full h-full object-cover object-center npp-base-fade"
+      />
+
+      {/* GPU-composited mosaic tile assembly (auto-fits any uploaded image aspect ratio) */}
+      <div
+        className="absolute inset-0 grid pointer-events-none"
+        style={{
+          gridTemplateColumns: `repeat(${GRID_COLS}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${GRID_ROWS}, minmax(0, 1fr))`,
+        }}
+        aria-hidden="true"
+      >
+        {MOSAIC_CELLS.map((cell) => (
+          <div
+            key={`${slide.id}-${cell.id}`}
+            className="relative w-full h-full overflow-hidden npp-tile-assemble"
+            style={
+              {
+                '--tile-x': cell.tileX,
+                '--tile-y': cell.tileY,
+                animationDelay: `${cell.delayMs}ms`,
+              } as React.CSSProperties
+            }
+          >
+            <img
+              src={slide.imageUrl}
+              alt=""
+              loading="eager"
+              decoding="async"
+              className="absolute max-w-none object-cover object-center"
+              style={{
+                width: `${GRID_COLS * 100}%`,
+                height: `${GRID_ROWS * 100}%`,
+                left: `-${cell.col * 100}%`,
+                top: `-${cell.row * 100}%`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AuthScreen() {
   const { refreshSession } = useAuth();
   const params = new URLSearchParams(window.location.search);
   const inviteToken = params.get('invite');
   const resetToken = params.get('reset');
 
-  const [mode, setMode] = useState<'login' | 'forgot' | 'invite' | 'reset'>(
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'invite' | 'reset'>(
     inviteToken ? 'invite' : resetToken ? 'reset' : 'login',
   );
   const [authModalOpen, setAuthModalOpen] = useState(Boolean(inviteToken || resetToken));
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
 
-  // Public slider state
-  const [slides, setSlides] = useState<HomepageSlideRecord[]>([]);
-  const [slidesLoaded, setSlidesLoaded] = useState(false);
+  // Public slider state (start with fallback slides so hero images render immediately)
+  const [slides, setSlides] = useState<HomepageSlideRecord[]>(DEFAULT_FALLBACK_SLIDES);
   const [slideIndex, setSlideIndex] = useState(0);
   const [sliderPaused, setSliderPaused] = useState(false);
   const [brokenSlideIds, setBrokenSlideIds] = useState<Record<string, boolean>>({});
@@ -57,13 +194,26 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [totpCode, setTotpCode] = useState('');
-  const [useBackupCode, setUseBackupCode] = useState(false);
-  const [backupCode, setBackupCode] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<UserRole | ''>('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Sign-Up (Admin-Approved Registration) state
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regTitle, setRegTitle] = useState('');
+  const [regRole, setRegRole] = useState<UserRole>('POLLING_STATION');
+  const [regRegionId, setRegRegionId] = useState('');
+  const [regConstituencyId, setRegConstituencyId] = useState('');
+  const [regStationId, setRegStationId] = useState('');
+  const [regCustomStationName, setRegCustomStationName] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regSuccess, setRegSuccess] = useState<string | null>(null);
+  const [regions, setRegions] = useState<RegionRecord[]>([]);
+  const [constituencies, setConstituencies] = useState<ConstituencyRecord[]>([]);
+  const [pollingStations, setPollingStations] = useState<PollingStationRecord[]>([]);
 
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -74,17 +224,9 @@ export function AuthScreen() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitePassword, setInvitePassword] = useState('');
   const [inviteConfirm, setInviteConfirm] = useState('');
-  const [mfaSetup, setMfaSetup] = useState<{
-    enrollmentToken: string;
-    qrDataUrl: string;
-    manualSecret: string;
-  } | null>(null);
-  const [inviteTotp, setInviteTotp] = useState('');
-  const [generatedBackupCodes, setGeneratedBackupCodes] = useState<string[] | null>(null);
 
   // Reset confirm state
   const [resetNewPwd, setResetNewPwd] = useState('');
-  const [resetTotp, setResetTotp] = useState('');
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,10 +235,28 @@ export function AuthScreen() {
       .catch(() => {});
 
     apiRequest<{ slides: HomepageSlideRecord[] }>('/api/meta/slides')
-      .then((res) => setSlides(res.slides))
-      .catch(() => {})
-      .finally(() => setSlidesLoaded(true));
+      .then((res) => {
+        if (Array.isArray(res.slides)) {
+          setSlides(res.slides);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'signup' || regions.length > 0) return;
+    apiRequest<{
+      regions: RegionRecord[];
+      constituencies: ConstituencyRecord[];
+      pollingStations: PollingStationRecord[];
+    }>('/api/meta/public-geography')
+      .then((geo) => {
+        setRegions(geo.regions);
+        setConstituencies(geo.constituencies);
+        setPollingStations(geo.pollingStations);
+      })
+      .catch(() => {});
+  }, [mode, regions.length]);
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -116,16 +276,35 @@ export function AuthScreen() {
   }, [slides.length, sliderPaused, authModalOpen]);
 
   useEffect(() => {
+    if (slides.length <= 1) return;
+    const nextIdx = (slideIndex + 1) % slides.length;
+    const nextUrl = slides[nextIdx]?.imageUrl;
+    if (nextUrl) {
+      const preloader = new window.Image();
+      preloader.decoding = 'async';
+      preloader.src = nextUrl;
+    }
+  }, [slides, slideIndex]);
+
+  useEffect(() => {
     if (slideIndex >= slides.length && slides.length > 0) {
       setSlideIndex(0);
     }
   }, [slides.length, slideIndex]);
 
   const activeSlide = slides[slideIndex] || null;
+  const filteredSignupCons = regRegionId
+    ? constituencies.filter((c) => c.regionId === regRegionId)
+    : [];
+  const filteredSignupStations = regConstituencyId
+    ? pollingStations.filter((s) => s.constituencyId === regConstituencyId)
+    : [];
 
-  function openSignIn(nextMode: 'login' | 'forgot' = 'login') {
+  function openAuthDialog(nextMode: 'login' | 'signup' | 'forgot' = 'login') {
     setMode(nextMode);
     setLoginError(null);
+    setLoginNotice(null);
+    setRegSuccess(null);
     setAuthModalOpen(true);
   }
 
@@ -142,8 +321,6 @@ export function AuthScreen() {
           body: {
             email,
             password,
-            totpCode: useBackupCode ? '' : totpCode,
-            backupCode: useBackupCode ? backupCode : '',
             selectedLevel: selectedLevel || undefined,
           },
         },
@@ -152,6 +329,44 @@ export function AuthScreen() {
         setLoginNotice(res.roleMismatchNotice);
       }
       await refreshSession();
+    } catch (err) {
+      setLoginError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginError(null);
+    setRegSuccess(null);
+    if (regPassword !== regConfirmPassword) {
+      setLoginError('Passwords do not match.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await apiRequest<{ message: string }>('/api/auth/register', {
+        method: 'POST',
+        body: {
+          fullName: regName,
+          email: regEmail,
+          titleOrOffice: regTitle,
+          role: regRole,
+          regionId: regRegionId || null,
+          constituencyId: regConstituencyId || null,
+          pollingStationId: regStationId || null,
+          customPollingStationName: regCustomStationName.trim() || undefined,
+          password: regPassword,
+        },
+      });
+      setRegSuccess(res.message);
+      setRegName('');
+      setRegEmail('');
+      setRegTitle('');
+      setRegPassword('');
+      setRegConfirmPassword('');
+      setRegCustomStationName('');
     } catch (err) {
       setLoginError((err as Error).message);
     } finally {
@@ -177,8 +392,9 @@ export function AuthScreen() {
     }
   }
 
-  async function handleInviteInitiateMfa(e: React.FormEvent) {
+  async function handleInviteActivate(e: React.FormEvent) {
     e.preventDefault();
+    if (!inviteToken) return;
     setInviteError(null);
     if (invitePassword !== inviteConfirm) {
       setInviteError('Passwords do not match.');
@@ -186,39 +402,15 @@ export function AuthScreen() {
     }
     setSubmitting(true);
     try {
-      const res = await apiRequest<{
-        enrollmentToken: string;
-        qrDataUrl: string;
-        manualSecret: string;
-      }>(`/api/auth/invite/${encodeURIComponent(inviteToken!)}/initiate-mfa`, {
-        method: 'POST',
-        body: { password: invitePassword },
-      });
-      setMfaSetup(res);
-    } catch (err) {
-      setInviteError((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleInviteComplete(e: React.FormEvent) {
-    e.preventDefault();
-    if (!mfaSetup || !inviteToken) return;
-    setInviteError(null);
-    setSubmitting(true);
-    try {
-      const res = await apiRequest<{ user: PublicUser; backupCodes: string[] }>(
-        `/api/auth/invite/${encodeURIComponent(inviteToken)}/complete`,
+      await apiRequest<{ user: PublicUser }>(
+        `/api/auth/invite/${encodeURIComponent(inviteToken)}/activate`,
         {
           method: 'POST',
-          body: {
-            enrollmentToken: mfaSetup.enrollmentToken,
-            totpCode: inviteTotp,
-          },
+          body: { password: invitePassword },
         },
       );
-      setGeneratedBackupCodes(res.backupCodes);
+      window.history.replaceState({}, '', '/');
+      await refreshSession();
     } catch (err) {
       setInviteError((err as Error).message);
     } finally {
@@ -238,7 +430,6 @@ export function AuthScreen() {
         body: {
           token: resetToken,
           newPassword: resetNewPwd,
-          totpCode: resetTotp,
         },
       });
       setResetMessage(res.message);
@@ -258,11 +449,8 @@ export function AuthScreen() {
           <div className="bg-white border-b border-slate-200/70" />
           <div className="bg-[#0B2B7E]" />
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-8">
-          <a
-            href="/"
-            className="flex items-center gap-3 whitespace-nowrap shrink-0"
-          >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
+          <a href="/" className="flex items-center gap-3 whitespace-nowrap shrink-0">
             <BrandMark size={30} />
             <span className="font-display text-base sm:text-lg font-semibold text-[#071A4D] tracking-tight">
               New Patriotic Party
@@ -290,14 +478,25 @@ export function AuthScreen() {
             </a>
           </nav>
 
-          <button
-            type="button"
-            onClick={() => openSignIn('login')}
-            className="min-h-[42px] px-4 sm:px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0"
-          >
-            <LogIn className="w-4 h-4 shrink-0" />
-            <span>Sign In</span>
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <PWAInstallButton variant="header" />
+            <button
+              type="button"
+              onClick={() => openAuthDialog('signup')}
+              className="min-h-[42px] px-3 sm:px-3.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Sign Up</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthDialog('login')}
+              className="min-h-[42px] px-3.5 sm:px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
+            >
+              <LogIn className="w-4 h-4 shrink-0" />
+              <span>Sign In</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -315,7 +514,7 @@ export function AuthScreen() {
           </div>
         )}
 
-        {/* Animated NPP Hero Image Slider */}
+        {/* Animated NPP Hero Image Slider with Mosaic Box Assembly */}
         <section
           id="gallery"
           className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8"
@@ -323,47 +522,34 @@ export function AuthScreen() {
           onMouseLeave={() => setSliderPaused(false)}
         >
           <div className="relative aspect-[16/10] sm:aspect-[16/8.2] w-full rounded-2xl overflow-hidden bg-[#071A4D] border border-slate-200">
-            {!slidesLoaded ? (
-              <div className="absolute inset-0 bg-[#071A4D] animate-pulse" />
-            ) : activeSlide ? (
+            {activeSlide ? (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeSlide.id}
-                  initial={{ opacity: 0 }}
+                  initial={{ opacity: 0.35 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                  exit={{ opacity: 0.25 }}
+                  transition={{ duration: 0.4 }}
                   className="absolute inset-0"
                 >
-                  {!brokenSlideIds[activeSlide.id] ? (
-                    <motion.img
-                      src={activeSlide.imageUrl}
-                      alt={activeSlide.title}
-                      referrerPolicy="no-referrer"
-                      onError={() =>
-                        setBrokenSlideIds((prev) => ({ ...prev, [activeSlide.id]: true }))
-                      }
-                      initial={{ scale: 1.06 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 6, ease: 'easeOut' }}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#071A4D] via-[#0B2B7E] to-[#7F0B10] flex items-center justify-center">
-                      <ImageIcon className="w-12 h-12 text-white/40" />
-                    </div>
-                  )}
+                  <MosaicHeroImage
+                    slide={activeSlide}
+                    broken={Boolean(brokenSlideIds[activeSlide.id])}
+                    onError={() =>
+                      setBrokenSlideIds((prev) => ({ ...prev, [activeSlide.id]: true }))
+                    }
+                  />
 
                   {/* Measured Contrast Scrim */}
                   <div
-                    className="absolute inset-0 bg-gradient-to-t from-[#071A4D]/92 via-[#071A4D]/40 to-black/15"
+                    className="absolute inset-0 bg-gradient-to-t from-[#071A4D]/90 via-[#071A4D]/35 to-black/15 pointer-events-none"
                     aria-hidden="true"
                   />
 
                   <motion.div
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.55, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.55, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
                     className="absolute inset-x-0 bottom-0 p-6 sm:p-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6"
                   >
                     <div className="max-w-2xl space-y-2.5">
@@ -381,11 +567,7 @@ export function AuthScreen() {
                     </div>
 
                     {slides.length > 1 && (
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="text-xs font-mono tabular-nums text-white/85 mr-1">
-                          {String(slideIndex + 1).padStart(2, '0')} /{' '}
-                          {String(slides.length).padStart(2, '0')}
-                        </span>
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() =>
@@ -423,7 +605,7 @@ export function AuthScreen() {
               </div>
             )}
 
-            {/* Subtle Top Tricolour Progress Strip */}
+            {/* Subtle Bottom Slide Indicator Bar */}
             {slides.length > 1 && (
               <div className="absolute bottom-0 inset-x-0 flex h-1 bg-white/15">
                 {slides.map((s, idx) => (
@@ -459,15 +641,24 @@ export function AuthScreen() {
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
               Guided by the motto <em>Development in Freedom</em>, the New Patriotic Party brings together party officers and community organizers across all 16 regions and 276 parliamentary constituencies to address local concerns, strengthen grassroots organization, and deliver accountable action.
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => openSignIn('login')}
+                onClick={() => openAuthDialog('login')}
                 className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium inline-flex items-center gap-2 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Executive Sign In</span>
               </button>
+              <button
+                type="button"
+                onClick={() => openAuthDialog('signup')}
+                className="min-h-[44px] px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-sm font-medium inline-flex items-center gap-2 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Request Access / Sign Up</span>
+              </button>
+              <PWAInstallButton variant="cta" />
             </div>
           </div>
 
@@ -476,12 +667,13 @@ export function AuthScreen() {
             className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 divide-y divide-slate-100"
           >
             <div className="pb-3">
-              <h3 className="text-sm font-semibold text-[#071A4D]">
-                Party Executive Structure
-              </h3>
+              <h3 className="text-sm font-semibold text-[#071A4D]">Party Executive Structure</h3>
             </div>
             {PARTY_LEVELS.map((lvl) => (
-              <div key={lvl.num} className="py-3.5 first:pt-0 last:pb-0 flex items-baseline gap-4">
+              <div
+                key={lvl.num}
+                className="py-3.5 first:pt-0 last:pb-0 flex items-baseline gap-4"
+              >
                 <span className="font-mono text-xs font-semibold text-[#D41118] tabular-nums shrink-0">
                   {lvl.num}
                 </span>
@@ -497,38 +689,45 @@ export function AuthScreen() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-          <span className="font-medium text-[#071A4D]">
-            New Patriotic Party · Ghana
-          </span>
-          <button
-            type="button"
-            onClick={() => openSignIn('login')}
-            className="font-medium text-[#0B2B7E] hover:underline"
-          >
-            Executive Sign In
-          </button>
+          <span className="font-medium text-[#071A4D]">New Patriotic Party · Ghana</span>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => openAuthDialog('signup')}
+              className="font-medium text-slate-700 hover:underline"
+            >
+              Sign Up
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthDialog('login')}
+              className="font-medium text-[#0B2B7E] hover:underline"
+            >
+              Executive Sign In
+            </button>
+          </div>
         </div>
       </footer>
 
-      {/* Sign-In / Invite / Password Reset Modal */}
+      {/* Sign-In / Sign-Up / Invite / Password Reset Modal */}
       <AnimatePresence>
         {authModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto"
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 backdrop-blur-xs p-0 sm:p-4 overflow-y-auto"
             role="dialog"
             aria-modal="true"
-            aria-label="Executive Sign In"
+            aria-label="Executive Portal Authentication"
           >
             <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-md bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl my-auto"
+              className="w-full sm:max-w-md bg-white border border-slate-200 rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-xl max-h-[92dvh] overflow-y-auto safe-pb sm:my-auto"
             >
               <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
                 <div className="bg-[#D41118]" />
@@ -545,22 +744,57 @@ export function AuthScreen() {
                     <h2 className="font-display text-xl font-semibold text-[#071A4D] mt-0.5">
                       {mode === 'login'
                         ? 'Executive Sign In'
-                        : mode === 'forgot'
-                          ? 'Request Password Reset'
-                          : mode === 'invite'
-                            ? 'Activate Executive Invitation'
-                            : 'Complete Password Reset'}
+                        : mode === 'signup'
+                          ? 'Executive Sign Up'
+                          : mode === 'forgot'
+                            ? 'Request Password Reset'
+                            : mode === 'invite'
+                              ? 'Activate Executive Invitation'
+                              : 'Complete Password Reset'}
                     </h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setAuthModalOpen(false)}
                     className="min-h-[40px] min-w-[40px] -mr-2 -mt-1 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-                    aria-label="Close sign in dialog"
+                    aria-label="Close dialog"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
+
+                {(mode === 'login' || mode === 'signup') && (
+                  <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl mb-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('login');
+                        setLoginError(null);
+                      }}
+                      className={`min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
+                        mode === 'login'
+                          ? 'bg-white text-[#071A4D] shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Sign In
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('signup');
+                        setLoginError(null);
+                      }}
+                      className={`min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
+                        mode === 'signup'
+                          ? 'bg-white text-[#071A4D] shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Sign Up
+                    </button>
+                  </div>
+                )}
 
                 {mode === 'login' && (
                   <form onSubmit={handleLogin} className="space-y-4">
@@ -652,52 +886,219 @@ export function AuthScreen() {
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="login-mfa" className="block text-xs font-medium text-slate-700">
-                          {useBackupCode ? 'Single-Use Backup Code' : 'Authenticator MFA Code'}
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setUseBackupCode((v) => !v)}
-                          className="text-xs text-slate-600 hover:text-slate-900 underline"
-                        >
-                          {useBackupCode ? 'Use 6-digit app code' : 'Use backup code'}
-                        </button>
-                      </div>
-                      {useBackupCode ? (
-                        <input
-                          id="login-mfa"
-                          type="text"
-                          required
-                          value={backupCode}
-                          onChange={(e) => setBackupCode(e.target.value)}
-                          placeholder="XXXXX-XXXXX"
-                          className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 font-mono text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0B2B7E]"
-                        />
-                      ) : (
-                        <input
-                          id="login-mfa"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]{6}"
-                          maxLength={6}
-                          required
-                          autoComplete="one-time-code"
-                          value={totpCode}
-                          onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="6-digit code"
-                          className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 font-mono text-sm tracking-widest text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0B2B7E]"
-                        />
-                      )}
-                    </div>
-
                     <button
                       type="submit"
                       disabled={submitting}
                       className="w-full min-h-[48px] rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60 transition-colors"
                     >
-                      {submitting ? 'Verifying credentials…' : 'Sign In'}
+                      {submitting ? 'Signing in…' : 'Sign In'}
+                    </button>
+                  </form>
+                )}
+
+                {mode === 'signup' && (
+                  <form onSubmit={handleSignUp} className="space-y-3.5">
+                    <p className="text-xs text-slate-600">
+                      New registrations require administrator approval before access is granted.
+                    </p>
+
+                    {loginError && (
+                      <div
+                        role="alert"
+                        className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800"
+                      >
+                        {loginError}
+                      </div>
+                    )}
+                    {regSuccess && (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-900">
+                        {regSuccess}
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-700">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        minLength={3}
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="Kwame Mensah"
+                        className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-700">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="executive@party-office.org"
+                        className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-700">
+                          Office / Title
+                        </label>
+                        <input
+                          type="text"
+                          value={regTitle}
+                          onChange={(e) => setRegTitle(e.target.value)}
+                          placeholder="e.g. Secretary"
+                          className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-700">
+                          Executive Level
+                        </label>
+                        <select
+                          value={regRole}
+                          onChange={(e) => {
+                            setRegRole(e.target.value as UserRole);
+                            setRegRegionId('');
+                            setRegConstituencyId('');
+                            setRegStationId('');
+                            setRegCustomStationName('');
+                          }}
+                          className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-2.5 text-sm"
+                        >
+                          <option value="POLLING_STATION">Polling-Station Executive</option>
+                          <option value="CONSTITUENCY">Constituency Executive</option>
+                          <option value="REGIONAL">Regional Executive</option>
+                          <option value="NATIONAL">National Executive</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {regRole !== 'NATIONAL' && (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-700">Region</label>
+                        <select
+                          required
+                          value={regRegionId}
+                          onChange={(e) => {
+                            setRegRegionId(e.target.value);
+                            setRegConstituencyId('');
+                            setRegStationId('');
+                          }}
+                          className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                        >
+                          <option value="">Select Region</option>
+                          {regions.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {(regRole === 'CONSTITUENCY' || regRole === 'POLLING_STATION') && (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-700">
+                          Constituency
+                        </label>
+                        <select
+                          required
+                          value={regConstituencyId}
+                          onChange={(e) => {
+                            setRegConstituencyId(e.target.value);
+                            setRegStationId('');
+                          }}
+                          className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                        >
+                          <option value="">Select Constituency</option>
+                          {filteredSignupCons.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {regRole === 'POLLING_STATION' && regConstituencyId && (
+                      <div className="space-y-2">
+                        {filteredSignupStations.length > 0 && (
+                          <div className="space-y-1">
+                            <label className="block text-xs font-medium text-slate-700">
+                              Polling Station
+                            </label>
+                            <select
+                              value={regStationId}
+                              onChange={(e) => {
+                                setRegStationId(e.target.value);
+                                if (e.target.value) setRegCustomStationName('');
+                              }}
+                              className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                            >
+                              <option value="">Select Registered Station (or type below)</option>
+                              {filteredSignupStations.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} ({s.code})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {!regStationId && (
+                          <div className="space-y-1">
+                            <label className="block text-xs font-medium text-slate-700">
+                              Polling Station Name
+                            </label>
+                            <input
+                              type="text"
+                              required={!regStationId}
+                              minLength={2}
+                              value={regCustomStationName}
+                              onChange={(e) => setRegCustomStationName(e.target.value)}
+                              placeholder="Enter your polling station name"
+                              className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-700">
+                        Password (min 12 chars, upper, lower, digit, symbol)
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-medium text-slate-700">
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={regConfirmPassword}
+                        onChange={(e) => setRegConfirmPassword(e.target.value)}
+                        className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full min-h-[46px] rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60 transition-colors"
+                    >
+                      {submitting ? 'Submitting Request…' : 'Submit Registration for Approval'}
                     </button>
                   </form>
                 )}
@@ -705,7 +1106,7 @@ export function AuthScreen() {
                 {mode === 'forgot' && (
                   <form onSubmit={handleForgotSubmit} className="space-y-4">
                     <p className="text-xs text-slate-500">
-                      Multi-factor authentication verification is required to confirm a password reset.
+                      Enter your approved executive email address to request a password reset link.
                     </p>
                     {loginError && (
                       <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800">
@@ -752,7 +1153,7 @@ export function AuthScreen() {
                 {mode === 'invite' && (
                   <div className="space-y-4">
                     <p className="text-xs text-slate-500">
-                      Set a strong password and enroll your authenticator app.
+                      Set a strong password to activate your approved executive account.
                     </p>
 
                     {inviteError && (
@@ -761,7 +1162,7 @@ export function AuthScreen() {
                       </div>
                     )}
 
-                    {invitedUser && !generatedBackupCodes && (
+                    {invitedUser && (
                       <div className="rounded-lg bg-slate-50 border border-slate-200 p-3.5 text-xs space-y-1">
                         <p className="font-semibold text-slate-900">{invitedUser.fullName}</p>
                         <p className="text-slate-600">
@@ -780,8 +1181,8 @@ export function AuthScreen() {
                       </div>
                     )}
 
-                    {invitedUser && !mfaSetup && !generatedBackupCodes && (
-                      <form onSubmit={handleInviteInitiateMfa} className="space-y-4">
+                    {invitedUser && (
+                      <form onSubmit={handleInviteActivate} className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="block text-xs font-medium text-slate-700">
                             New Password (min 12 chars, upper, lower, digit, symbol)
@@ -811,85 +1212,9 @@ export function AuthScreen() {
                           disabled={submitting}
                           className="w-full min-h-[48px] rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60"
                         >
-                          {submitting ? 'Preparing MFA…' : 'Continue to MFA Enrollment'}
+                          {submitting ? 'Activating Account…' : 'Activate Account & Sign In'}
                         </button>
                       </form>
-                    )}
-
-                    {mfaSetup && !generatedBackupCodes && (
-                      <form onSubmit={handleInviteComplete} className="space-y-4">
-                        <div className="flex flex-col items-center gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
-                          <img
-                            src={mfaSetup.qrDataUrl}
-                            alt="Authenticator QR Code"
-                            className="w-44 h-44 rounded-lg bg-white p-2 border border-slate-200"
-                          />
-                          <div className="text-center space-y-1">
-                            <p className="text-xs text-slate-600">
-                              Scan with Google Authenticator, Authy, or Microsoft Authenticator.
-                            </p>
-                            <p className="text-xs font-mono text-slate-800 break-all">
-                              Manual key: {mfaSetup.manualSecret}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="block text-xs font-medium text-slate-700">
-                            Enter 6-digit Verification Code
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]{6}"
-                            maxLength={6}
-                            required
-                            value={inviteTotp}
-                            onChange={(e) => setInviteTotp(e.target.value.replace(/\D/g, ''))}
-                            className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 font-mono text-sm tracking-widest"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="w-full min-h-[48px] rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C] disabled:opacity-60"
-                        >
-                          {submitting ? 'Activating Account…' : 'Verify & Activate Account'}
-                        </button>
-                      </form>
-                    )}
-
-                    {generatedBackupCodes && (
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
-                          <div className="flex items-center gap-2 text-emerald-900 font-semibold text-sm">
-                            <KeyRound className="w-4 h-4" />
-                            <span>Save Your Single-Use MFA Backup Codes</span>
-                          </div>
-                          <p className="text-xs text-emerald-800">
-                            Store these recovery codes offline. Each code can be used once if you lose access to your authenticator device.
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 pt-2">
-                            {generatedBackupCodes.map((code) => (
-                              <code
-                                key={code}
-                                className="bg-white border border-emerald-200 rounded px-2.5 py-1.5 text-xs font-mono text-slate-900 text-center"
-                              >
-                                {code}
-                              </code>
-                            ))}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.history.replaceState({}, '', '/');
-                            void refreshSession();
-                          }}
-                          className="w-full min-h-[48px] rounded-lg bg-[#0B2B7E] text-white text-sm font-medium hover:bg-[#071E5C]"
-                        >
-                          Continue to Executive Portal
-                        </button>
-                      </div>
                     )}
                   </div>
                 )}
@@ -897,7 +1222,7 @@ export function AuthScreen() {
                 {mode === 'reset' && (
                   <form onSubmit={handleResetConfirm} className="space-y-4">
                     <p className="text-xs text-slate-500">
-                      Confirm your new strong password with your existing authenticator MFA code.
+                      Set a new strong password for your executive account.
                     </p>
                     {loginError && (
                       <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800">
@@ -919,20 +1244,6 @@ export function AuthScreen() {
                         value={resetNewPwd}
                         onChange={(e) => setResetNewPwd(e.target.value)}
                         className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-medium text-slate-700">
-                        6-Digit Authenticator Code
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        required
-                        value={resetTotp}
-                        onChange={(e) => setResetTotp(e.target.value.replace(/\D/g, ''))}
-                        className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 font-mono text-sm tracking-widest"
                       />
                     </div>
                     <div className="flex items-center gap-3">

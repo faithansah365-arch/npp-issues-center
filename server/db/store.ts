@@ -111,7 +111,7 @@ function createDefaultHomepageSlides(): HomepageSlideRecord[] {
       title: 'Development in Freedom',
       caption:
         'New Patriotic Party delegates, organizers, and leadership working together across all 16 regions of Ghana.',
-      imageUrl: '/src/assets/images/npp_civic_assembly_1795358498204.jpg',
+      imageUrl: '/assets/slides/npp_civic_assembly_1795358498204.jpg',
       storageKey: null,
       mimeType: 'image/jpeg',
       sortOrder: 1,
@@ -125,7 +125,7 @@ function createDefaultHomepageSlides(): HomepageSlideRecord[] {
       title: 'Coordinated Executive Leadership',
       caption:
         'Polling-station, constituency, regional, and national executives reviewing community priorities and action plans.',
-      imageUrl: '/src/assets/images/npp_executive_forum_1795358497409.jpg',
+      imageUrl: '/assets/slides/npp_executive_forum_1795358497409.jpg',
       storageKey: null,
       mimeType: 'image/jpeg',
       sortOrder: 2,
@@ -139,7 +139,7 @@ function createDefaultHomepageSlides(): HomepageSlideRecord[] {
       title: 'Rooted in Every Constituency',
       caption:
         'Listening to citizens across all 276 parliamentary constituencies and turning local concerns into timely action.',
-      imageUrl: '/src/assets/images/npp_community_outreach_1795358498035.jpg',
+      imageUrl: '/assets/slides/npp_community_outreach_1795358498035.jpg',
       storageKey: null,
       mimeType: 'image/jpeg',
       sortOrder: 3,
@@ -316,9 +316,23 @@ class DataStore {
       const existingSlidesCount = await this.col<HomepageSlideRecord>('homepageSlides').countDocuments();
       if (existingSlidesCount === 0) {
         await this.col<HomepageSlideRecord>('homepageSlides').insertMany(createDefaultHomepageSlides());
+      } else {
+        const slides = await this.listHomepageSlides();
+        for (const s of slides) {
+          if (s.imageUrl.startsWith('/src/assets/images/')) {
+            s.imageUrl = s.imageUrl.replace('/src/assets/images/', '/assets/slides/');
+            await this.saveHomepageSlide(s);
+          }
+        }
       }
     } else if (!this.devState.homepageSlides) {
       this.devState.homepageSlides = createDefaultHomepageSlides();
+    } else {
+      for (const s of this.devState.homepageSlides) {
+        if (s.imageUrl.startsWith('/src/assets/images/')) {
+          s.imageUrl = s.imageUrl.replace('/src/assets/images/', '/assets/slides/');
+        }
+      }
     }
 
     this.persistDev();

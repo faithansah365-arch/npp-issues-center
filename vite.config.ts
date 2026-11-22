@@ -3,12 +3,125 @@ import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
     plugins: [
       react(),
       tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+          'assets/aistudio/images__1__1959a68c.png',
+        ],
+        manifest: {
+          id: '/',
+          name: 'NPP Internal Issue Resolution Portal',
+          short_name: 'NPP Portal',
+          description:
+            'Internal party issue reporting, escalation, and resolution portal for New Patriotic Party (NPP) executives in Ghana.',
+          theme_color: '#0B2B7E',
+          background_color: '#071A4D',
+          display: 'standalone',
+          orientation: 'portrait-primary',
+          start_url: '/',
+          scope: '/',
+          categories: ['productivity', 'utilities'],
+          icons: [
+            {
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff,woff2}'],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//],
+          cleanupOutdatedCaches: true,
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/api\/meta\/(slides|public-geography|geography|categories|privacy)$/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'npp-meta-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+                cacheableResponse: {
+                  statuses: [200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/api\/meta\/slides\/.*\/image$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'npp-slide-images-cache',
+                expiration: {
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                cacheableResponse: {
+                  statuses: [200],
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.
@@ -28,6 +141,25 @@ export default defineConfig(() => {
         },
       },
     ],
+    build: {
+      cssCodeSplit: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/lucide-react/')) {
+              return 'ui-icons';
+            }
+            if (id.includes('node_modules/motion/')) {
+              return 'motion-vendor';
+            }
+            return undefined;
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

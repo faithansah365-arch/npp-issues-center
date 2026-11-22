@@ -13,6 +13,7 @@ import { USER_ROLE_LABELS, type IssueLevel } from '../../shared/types';
 import { useAuth } from '../context/AuthContext';
 import { BrandMark } from './BrandMark';
 import { PrivacyComplianceModal } from './PrivacyComplianceModal';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type ExecutiveTab = 'dashboard' | 'issues' | 'recurring' | 'notifications';
 export type SuperAdminWorkspace = 'admin' | IssueLevel;
@@ -170,6 +171,7 @@ export function PortalShell({
         </nav>
 
         <div className="p-3 border-t border-slate-200 space-y-1">
+          <PWAInstallButton variant="sidebar" />
           <button
             type="button"
             onClick={() => setPrivacyOpen(true)}
@@ -213,7 +215,7 @@ export function PortalShell({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {user.role === 'SUPER_ADMIN' && onSwitchWorkspace && (
                 <div className="lg:hidden flex items-center gap-1.5">
                   <select
@@ -230,13 +232,25 @@ export function PortalShell({
                   </select>
                 </div>
               )}
+              <div className="lg:hidden">
+                <PWAInstallButton variant="header" />
+              </div>
               <button
                 type="button"
                 onClick={onNewIssue}
-                className="min-h-[40px] px-3.5 sm:px-4 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
+                className="min-h-[40px] px-3 sm:px-4 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0"
               >
                 <FilePlus2 className="w-4 h-4 shrink-0" />
-                <span>Report Concern</span>
+                <span className="hidden xs:inline sm:inline">Report Concern</span>
+                <span className="xs:hidden sm:hidden">Report</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrivacyOpen(true)}
+                className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+                aria-label="Privacy & Data Notice"
+              >
+                <Shield className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -251,40 +265,42 @@ export function PortalShell({
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-10">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-6 pb-24 lg:pb-10">
           {children}
         </main>
       </div>
 
-      {/* Mobile Fixed Bottom Tab Bar (56px height, well under 15% cap) */}
+      {/* Mobile Fixed Bottom Tab Bar with safe-area padding */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 h-15 grid grid-cols-4 items-center"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 safe-pb"
         aria-label="Mobile Navigation"
       >
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onTabChange(item.id)}
-              className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 relative ${
-                active ? 'text-[#0B2B7E] font-semibold' : 'text-slate-500'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[11px] tracking-tight whitespace-nowrap">
-                {item.shortLabel}
-              </span>
-              {typeof item.badge === 'number' && item.badge > 0 && (
-                <span className="absolute top-1.5 right-5 text-[10px] font-mono tabular-nums font-bold text-[#D41118]">
-                  {item.badge}
+        <div className="h-15 grid grid-cols-4 items-center">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onTabChange(item.id)}
+                className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 relative ${
+                  active ? 'text-[#0B2B7E] font-semibold' : 'text-slate-500'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[11px] tracking-tight whitespace-nowrap">
+                  {item.shortLabel}
                 </span>
-              )}
-            </button>
-          );
-        })}
+                {typeof item.badge === 'number' && item.badge > 0 && (
+                  <span className="absolute top-1.5 right-4 text-[10px] font-mono tabular-nums font-bold text-[#D41118]">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       <PrivacyComplianceModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
