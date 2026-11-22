@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import express from 'express';
 import { getApiApp } from './server/app.ts';
@@ -6,11 +7,15 @@ import { config } from './server/config.ts';
 
 async function startServer() {
   const app = await getApiApp();
+  const httpServer = http.createServer(app);
 
   if (!config.isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -34,7 +39,7 @@ async function startServer() {
     }
   }
 
-  app.listen(config.port, '0.0.0.0', () => {
+  httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(`[server] NPP Internal Issue Portal running on http://0.0.0.0:${config.port}`);
   });
 }
