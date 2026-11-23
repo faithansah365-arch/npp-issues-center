@@ -202,13 +202,13 @@ export function PortalShell({
             <div className="bg-white border-b border-slate-200/70" />
             <div className="bg-[#0B2B7E]" />
           </div>
-          <div className="h-14 lg:h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="lg:hidden">
+          <div className="h-14 lg:h-16 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="lg:hidden shrink-0">
                 <BrandMark size={24} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#071A4D] truncate">
+                <p className="text-xs sm:text-sm font-semibold text-[#071A4D] truncate">
                   {portalTitle}
                 </p>
                 <p className="hidden sm:block text-xs text-slate-500 truncate">
@@ -217,23 +217,7 @@ export function PortalShell({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {user.role === 'SUPER_ADMIN' && onSwitchWorkspace && (
-                <div className="lg:hidden flex items-center gap-1.5">
-                  <select
-                    aria-label="Switch Portal View"
-                    value={effectiveLevel}
-                    onChange={(e) => onSwitchWorkspace(e.target.value as SuperAdminWorkspace)}
-                    className="min-h-[38px] rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800"
-                  >
-                    <option value="POLLING_STATION">Station</option>
-                    <option value="CONSTITUENCY">Constituency</option>
-                    <option value="REGIONAL">Regional</option>
-                    <option value="NATIONAL">National</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-              )}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <ThemeToggle variant="light" />
               <div className="lg:hidden">
                 <PWAInstallButton variant="header" />
@@ -241,16 +225,16 @@ export function PortalShell({
               <button
                 type="button"
                 onClick={onNewIssue}
-                className="min-h-[40px] px-3 sm:px-4 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0"
+                className="min-h-[38px] sm:min-h-[40px] px-2.5 sm:px-4 rounded-lg bg-[#0B2B7E] text-white text-xs sm:text-sm font-medium hover:bg-[#071E5C] transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0"
               >
                 <FilePlus2 className="w-4 h-4 shrink-0" />
-                <span className="hidden xs:inline sm:inline">Report Concern</span>
-                <span className="xs:hidden sm:hidden">Report</span>
+                <span className="hidden sm:inline">Report Concern</span>
+                <span className="sm:hidden">Report</span>
               </button>
               <button
                 type="button"
                 onClick={() => setPrivacyOpen(true)}
-                className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+                className="lg:hidden min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
                 aria-label="Privacy & Data Notice"
               >
                 <Shield className="w-4 h-4" />
@@ -258,13 +242,32 @@ export function PortalShell({
               <button
                 type="button"
                 onClick={() => void logout()}
-                className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+                className="lg:hidden min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
                 aria-label="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>
+          {user.role === 'SUPER_ADMIN' && onSwitchWorkspace && (
+            <div className="lg:hidden border-t border-slate-200 px-3 py-1.5 flex items-center justify-between gap-2 bg-slate-50/70">
+              <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">
+                Portal View
+              </span>
+              <select
+                aria-label="Switch Portal View"
+                value={effectiveLevel}
+                onChange={(e) => onSwitchWorkspace(e.target.value as SuperAdminWorkspace)}
+                className="min-h-[36px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-800 max-w-[65%]"
+              >
+                <option value="POLLING_STATION">Polling Station</option>
+                <option value="CONSTITUENCY">Constituency</option>
+                <option value="REGIONAL">Regional</option>
+                <option value="NATIONAL">National</option>
+                <option value="admin">Platform Admin</option>
+              </select>
+            </div>
+          )}
         </header>
 
         {/* Scrollable Content */}

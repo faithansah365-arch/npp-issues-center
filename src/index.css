@@ -17,6 +17,15 @@
 }
 
 @layer base {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   html {
     font-family: var(--font-sans);
     background-color: #f7f9fc;
@@ -29,12 +38,26 @@
     color: #f1f5f9;
   }
 
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
   }
 
   button, a, select, input, textarea, label {
     touch-action: manipulation;
+  }
+
+  @media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px;
+    }
   }
 }
 

@@ -946,11 +946,11 @@ export function PlatformAdminPortal({
           <div className="bg-white" />
           <div className="bg-[#0B2B7E]" />
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
-            <BrandMark size={28} />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <BrandMark size={26} />
             <div className="min-w-0">
-              <p className="font-display text-sm sm:text-base font-semibold truncate">
+              <p className="font-display text-xs sm:text-base font-semibold truncate">
                 Platform Administration Console
               </p>
               <p className="text-[11px] text-white/75 truncate">
@@ -958,7 +958,7 @@ export function PlatformAdminPortal({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <ThemeToggle variant="dark-header" />
             <PWAInstallButton variant="dark-header" />
             <button

@@ -48,7 +48,11 @@ export const PWAInstallButton: React.FC<{
         ) : (
           <Download className="w-4 h-4 shrink-0" />
         )}
-        <span className={variant === 'header' ? 'hidden xs:inline sm:inline' : ''}>
+        <span
+          className={
+            variant === 'header' || variant === 'dark-header' ? 'hidden sm:inline' : ''
+          }
+        >
           {variant === 'sidebar' ? 'Install Mobile App' : 'Install App'}
         </span>
       </button>

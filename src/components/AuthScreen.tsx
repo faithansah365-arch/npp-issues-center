@@ -460,11 +460,12 @@ export function AuthScreen() {
           <div className="bg-white border-b border-slate-200/70" />
           <div className="bg-[#0B2B7E]" />
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
-          <a href="/" className="flex items-center gap-3 whitespace-nowrap shrink-0">
-            <BrandMark size={30} />
-            <span className="font-display text-base sm:text-lg font-semibold text-[#071A4D] tracking-tight">
-              New Patriotic Party
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-6">
+          <a href="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <BrandMark size={28} />
+            <span className="font-display text-sm sm:text-lg font-semibold text-[#071A4D] tracking-tight truncate">
+              <span className="sm:hidden">NPP Portal</span>
+              <span className="hidden sm:inline">New Patriotic Party</span>
             </span>
           </a>
 
@@ -495,7 +496,8 @@ export function AuthScreen() {
             <button
               type="button"
               onClick={() => openAuthDialog('signup')}
-              className="min-h-[42px] px-3 sm:px-3.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+              aria-label="Sign Up"
+              className="min-h-[38px] sm:min-h-[42px] px-2.5 sm:px-3.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
             >
               <UserPlus className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Sign Up</span>
@@ -503,7 +505,7 @@ export function AuthScreen() {
             <button
               type="button"
               onClick={() => openAuthDialog('login')}
-              className="min-h-[42px] px-3.5 sm:px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
+              className="min-h-[38px] sm:min-h-[42px] px-3 sm:px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
             >
               <LogIn className="w-4 h-4 shrink-0" />
               <span>Sign In</span>
@@ -562,17 +564,17 @@ export function AuthScreen() {
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.55, delay: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-x-0 bottom-0 p-6 sm:p-10 flex flex-col sm:flex-row sm:items-end justify-between gap-6"
+                    className="absolute inset-x-0 bottom-0 p-4 sm:p-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6"
                   >
-                    <div className="max-w-2xl space-y-2.5">
-                      <p className="text-xs font-semibold text-[#F5C6C8] tracking-wide uppercase">
+                    <div className="max-w-2xl space-y-1.5 sm:space-y-2.5 min-w-0">
+                      <p className="text-[10px] sm:text-xs font-semibold text-[#F5C6C8] tracking-wide uppercase">
                         New Patriotic Party · Ghana
                       </p>
-                      <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl font-semibold text-white tracking-tight text-balance">
+                      <h1 className="font-display text-xl sm:text-4xl lg:text-5xl font-semibold text-white tracking-tight text-balance">
                         {activeSlide.title}
                       </h1>
                       {activeSlide.caption && (
-                        <p className="text-sm sm:text-base text-white/90 leading-relaxed max-w-xl">
+                        <p className="hidden sm:block text-sm sm:text-base text-white/90 leading-relaxed max-w-xl">
                           {activeSlide.caption}
                         </p>
                       )}
