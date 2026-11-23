@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { BrandMark } from './BrandMark';
 import { PrivacyComplianceModal } from './PrivacyComplianceModal';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ThemeToggle } from './ThemeToggle';
 
 export type ExecutiveTab = 'dashboard' | 'issues' | 'recurring' | 'notifications';
 export type SuperAdminWorkspace = 'admin' | IssueLevel;
@@ -171,6 +172,7 @@ export function PortalShell({
         </nav>
 
         <div className="p-3 border-t border-slate-200 space-y-1">
+          <ThemeToggle variant="sidebar" />
           <PWAInstallButton variant="sidebar" />
           <button
             type="button"
@@ -232,6 +234,7 @@ export function PortalShell({
                   </select>
                 </div>
               )}
+              <ThemeToggle variant="light" />
               <div className="lg:hidden">
                 <PWAInstallButton variant="header" />
               </div>

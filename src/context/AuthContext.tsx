@@ -7,7 +7,7 @@ interface AuthContextValue {
   unreadNotifications: number;
   retentionDays: number;
   loading: boolean;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<PublicUser | null>;
   setUnreadNotifications: React.Dispatch<React.SetStateAction<number>>;
   logout: () => Promise<void>;
 }
@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [retentionDays, setRetentionDays] = useState(730);
   const [loading, setLoading] = useState(true);
 
-  const refreshSession = useCallback(async () => {
+  const refreshSession = useCallback(async (): Promise<PublicUser | null> => {
     try {
       const data = await apiRequest<{
         user: PublicUser;
@@ -30,9 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
       setUnreadNotifications(data.unreadNotifications);
       setRetentionDays(data.retentionDays);
+      return data.user;
     } catch {
       setUser(null);
       setUnreadNotifications(0);
+      return null;
     } finally {
       setLoading(false);
     }

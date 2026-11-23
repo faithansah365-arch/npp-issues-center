@@ -14,7 +14,7 @@ import {
   type UserRecord,
   type UserRole,
 } from '../../shared/types.ts';
-import { config, isSmtpConfigured } from '../config.ts';
+import { config, isEnvSuperAdminConfigured, isSmtpConfigured } from '../config.ts';
 import { store, type BackupPayload } from '../db/store.ts';
 import {
   requireAuth,
@@ -28,6 +28,7 @@ import {
   hashPassword,
   sha256,
   validatePasswordStrength,
+  verifyPassword,
 } from '../security/crypto.ts';
 import { sendTransactionalEmail } from '../services/email.ts';
 import { dispatchNotification } from '../services/notifications.ts';
@@ -137,6 +138,7 @@ adminRouter.get('/overview', async (_req, res) => {
       persistentSessionSecret: config.hasPersistentSessionSecret,
       persistentEncryptionKey: config.hasPersistentEncryptionKey,
       bootstrapSecretRemoved: !config.bootstrapAdminSecret,
+      envSuperAdminConfigured: isEnvSuperAdminConfigured(),
       smtpConfigured: isSmtpConfigured(),
       dpaChecklistComplete: Boolean(
         settings?.ghanaDpaChecklist.dpaRegistrationReviewed &&
@@ -159,6 +161,122 @@ adminRouter.get('/overview', async (_req, res) => {
     },
     recentAuditEvents: logs.slice(0, 10),
   });
+});
+
+adminRouter.patch('/account', async (req: AuthenticatedRequest, res) => {
+  try {
+    const actor = req.authUser!;
+    const { currentPassword, fullName, newEmail, newPassword } = req.body ?? {};
+
+    if (typeof currentPassword !== 'string' || currentPassword.length === 0) {
+      res.status(400).json({ error: 'Enter your current password to confirm credential changes.' });
+      return;
+    }
+
+    if (!actor.passwordHash) {
+      res.status(400).json({ error: 'Account password record is unavailable.' });
+      return;
+    }
+
+    const currentValid = await verifyPassword(currentPassword, actor.passwordHash);
+    if (!currentValid) {
+      await logAuditEvent({
+        actorUserId: actor.id,
+        actorName: actor.fullName,
+        actorRole: actor.role,
+        action: 'SUPER_ADMIN_CREDENTIALS_DENIED',
+        targetType: 'USER',
+        targetId: actor.id,
+        severity: 'WARNING',
+        details: 'Rejected Super Admin credential update due to invalid current password.',
+        ip: req.ip,
+      });
+      res.status(401).json({ error: 'Current password is incorrect.' });
+      return;
+    }
+
+    const trimmedEmail =
+      typeof newEmail === 'string' && newEmail.trim().length > 0
+        ? newEmail.trim().toLowerCase()
+        : '';
+    const hasPasswordChange = typeof newPassword === 'string' && newPassword.length > 0;
+    const trimmedName =
+      typeof fullName === 'string' && fullName.trim().length > 0 ? fullName.trim() : '';
+
+    if (!trimmedEmail && !hasPasswordChange && !trimmedName) {
+      res.status(400).json({ error: 'Provide a new email, password, or display name to update.' });
+      return;
+    }
+
+    const updatedFields: string[] = [];
+
+    if (trimmedName && trimmedName !== actor.fullName) {
+      if (trimmedName.length < 3) {
+        res.status(400).json({ error: 'Full name must be at least 3 characters.' });
+        return;
+      }
+      actor.fullName = trimmedName;
+      updatedFields.push('fullName');
+    }
+
+    if (trimmedEmail && trimmedEmail !== actor.email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        res.status(400).json({ error: 'Provide a valid administrator email address.' });
+        return;
+      }
+      const existing = await store.getUserByEmail(trimmedEmail);
+      if (existing && existing.id !== actor.id) {
+        res.status(409).json({ error: 'That email address is already used by another account.' });
+        return;
+      }
+      actor.email = trimmedEmail;
+      updatedFields.push('email');
+    }
+
+    if (hasPasswordChange) {
+      const pwdErr = validatePasswordStrength(newPassword);
+      if (pwdErr) {
+        res.status(400).json({ error: pwdErr });
+        return;
+      }
+      actor.passwordHash = await hashPassword(newPassword);
+      updatedFields.push('password');
+    }
+
+    if (updatedFields.length === 0) {
+      res.status(400).json({ error: 'No credential changes detected.' });
+      return;
+    }
+
+    actor.updatedAt = new Date().toISOString();
+    await store.saveUser(actor);
+
+    if (updatedFields.includes('password') || updatedFields.includes('email')) {
+      await store.revokeOtherSessionsForUser(actor.id, req.authSession?.id);
+    }
+
+    await logAuditEvent({
+      actorUserId: actor.id,
+      actorName: actor.fullName,
+      actorRole: actor.role,
+      action: 'SUPER_ADMIN_CREDENTIALS_UPDATED',
+      targetType: 'USER',
+      targetId: actor.id,
+      severity: 'CRITICAL',
+      details: `Updated Super Admin credentials (${updatedFields.join(', ')}) for ${actor.email}.`,
+      ip: req.ip,
+    });
+
+    const geo = await getGeoMaps();
+    res.json({
+      user: toPublicUser(actor, geo),
+      updatedFields,
+      envOverrideActive: isEnvSuperAdminConfigured(),
+    });
+  } catch (err) {
+    console.error('[admin/account PATCH]', err);
+    res.status(500).json({ error: 'Unable to update administrator credentials.' });
+  }
 });
 
 adminRouter.get('/users', async (_req, res) => {

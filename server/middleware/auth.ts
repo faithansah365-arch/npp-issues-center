@@ -21,23 +21,45 @@ export interface AuthenticatedRequest extends Request {
   authSession?: SessionRecord;
 }
 
-export function setSessionCookie(res: Response, rawToken: string, maxAgeMs: number): void {
-  res.cookie(SESSION_COOKIE_NAME, rawToken, {
+export function isHttpsRequest(req?: Request): boolean {
+  if (req) {
+    const proto = (req.get('x-forwarded-proto') || '').split(',')[0].trim().toLowerCase();
+    const origin = (req.get('origin') || '').trim().toLowerCase();
+    const referer = (req.get('referer') || '').trim().toLowerCase();
+
+    if (req.secure || proto === 'https' || origin.startsWith('https://') || referer.startsWith('https://')) {
+      return true;
+    }
+    if (origin.startsWith('http://') || referer.startsWith('http://')) {
+      return false;
+    }
+  }
+  return Boolean(config.isProd || config.isVercel || config.appUrl.startsWith('https://'));
+}
+
+function getSessionCookieOptions(req?: Request, maxAgeMs?: number) {
+  const https = isHttpsRequest(req);
+  const opts: Record<string, unknown> = {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: config.isProd || config.isVercel || config.appUrl.startsWith('https://'),
+    sameSite: https ? 'none' : 'lax',
+    secure: https,
     path: '/',
-    maxAge: maxAgeMs,
-  });
+  };
+  if (https) {
+    opts.partitioned = true;
+  }
+  if (typeof maxAgeMs === 'number') {
+    opts.maxAge = maxAgeMs;
+  }
+  return opts;
+}
+
+export function setSessionCookie(res: Response, rawToken: string, maxAgeMs: number): void {
+  res.cookie(SESSION_COOKIE_NAME, rawToken, getSessionCookieOptions(res.req, maxAgeMs));
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(SESSION_COOKIE_NAME, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: config.isProd || config.isVercel || config.appUrl.startsWith('https://'),
-    path: '/',
-  });
+  res.clearCookie(SESSION_COOKIE_NAME, getSessionCookieOptions(res.req));
 }
 
 export function requireCsrf(req: Request, res: Response, next: NextFunction): void {
@@ -68,8 +90,13 @@ export function requireCsrf(req: Request, res: Response, next: NextFunction): vo
     }
     const forwardedHost = req.get('x-forwarded-host');
     if (forwardedHost) {
-      allowedOrigins.add(`http://${forwardedHost}`);
-      allowedOrigins.add(`https://${forwardedHost}`);
+      for (const h of forwardedHost.split(',')) {
+        const trimmed = h.trim();
+        if (trimmed) {
+          allowedOrigins.add(`http://${trimmed}`);
+          allowedOrigins.add(`https://${trimmed}`);
+        }
+      }
     }
     if (!allowedOrigins.has(origin)) {
       res.status(403).json({ error: 'Request origin is not permitted.' });

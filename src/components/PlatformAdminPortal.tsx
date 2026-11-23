@@ -37,10 +37,12 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { BrandMark } from './BrandMark';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ThemeToggle } from './ThemeToggle';
 
 interface SetupStatus {
   hasSuperAdmin: boolean;
   bootstrapConfigured: boolean;
+  envSuperAdminConfigured?: boolean;
   storageMode: 'mongodb_atlas' | 'local_dev';
   smtpConfigured: boolean;
 }
@@ -54,6 +56,7 @@ interface AdminOverview {
     persistentSessionSecret: boolean;
     persistentEncryptionKey: boolean;
     bootstrapSecretRemoved: boolean;
+    envSuperAdminConfigured?: boolean;
     smtpConfigured: boolean;
     dpaChecklistComplete: boolean;
   };
@@ -161,6 +164,15 @@ export function PlatformAdminPortal({
   const [bgReason, setBgReason] = useState('');
   const [bgResult, setBgResult] = useState<IssueRecord | null>(null);
 
+  // Super Admin self-service email/password management
+  const [acctFullName, setAcctFullName] = useState('');
+  const [acctEmail, setAcctEmail] = useState('');
+  const [acctCurrentPassword, setAcctCurrentPassword] = useState('');
+  const [acctNewPassword, setAcctNewPassword] = useState('');
+  const [acctConfirmPassword, setAcctConfirmPassword] = useState('');
+  const [acctShowPasswords, setAcctShowPasswords] = useState(false);
+  const [acctSaving, setAcctSaving] = useState(false);
+
   const loadSetupStatus = () => {
     setStatusLoading(true);
     apiRequest<SetupStatus>('/api/setup/status')
@@ -205,6 +217,8 @@ export function PlatformAdminPortal({
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') {
+      setAcctFullName(user.fullName);
+      setAcctEmail(user.email);
       void loadAdminData();
     }
   }, [user]);
@@ -224,7 +238,12 @@ export function PlatformAdminPortal({
         },
       });
       loadSetupStatus();
-      await refreshSession();
+      const me = await refreshSession();
+      if (!me) {
+        setBootError(
+          'Super Admin account created, but your browser blocked the session cookie inside this preview frame. Open /platform-admin in a new tab or allow cookies for this site.',
+        );
+      }
     } catch (err) {
       setBootError((err as Error).message);
     } finally {
@@ -244,7 +263,12 @@ export function PlatformAdminPortal({
           password: loginPassword,
         },
       });
-      await refreshSession();
+      const me = await refreshSession();
+      if (!me) {
+        setLoginError(
+          'Your credentials were verified, but your browser blocked the session cookie inside this preview frame. Please open the portal in a new tab or allow cookies for this site.',
+        );
+      }
     } catch (err) {
       setLoginError((err as Error).message);
     } finally {
@@ -507,6 +531,50 @@ export function PlatformAdminPortal({
     }
   }
 
+  async function handleUpdateSuperAdminAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setAdminError(null);
+    setAdminFeedback(null);
+
+    if (acctNewPassword && acctNewPassword !== acctConfirmPassword) {
+      setAdminError('New password and confirmation do not match.');
+      return;
+    }
+
+    setAcctSaving(true);
+    try {
+      const res = await apiRequest<{
+        user: PublicUser;
+        updatedFields: string[];
+        envOverrideActive: boolean;
+      }>('/api/admin/account', {
+        method: 'PATCH',
+        body: {
+          currentPassword: acctCurrentPassword,
+          fullName: acctFullName.trim(),
+          newEmail: acctEmail.trim(),
+          newPassword: acctNewPassword || undefined,
+        },
+      });
+      setAcctCurrentPassword('');
+      setAcctNewPassword('');
+      setAcctConfirmPassword('');
+      await refreshSession();
+      await loadAdminData();
+      setAdminFeedback(
+        `Super Admin account updated (${res.updatedFields.join(', ')}).${
+          res.envOverrideActive
+            ? ' Note: Changing SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD in server secrets will override these values on next restart.'
+            : ''
+        }`,
+      );
+    } catch (err) {
+      setAdminError((err as Error).message);
+    } finally {
+      setAcctSaving(false);
+    }
+  }
+
   function handleSlideFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
     if (slidePreviewUrl) {
@@ -633,33 +701,47 @@ export function PlatformAdminPortal({
             <div className="bg-[#0B2B7E]" />
           </div>
           <div className="p-6 sm:p-8 space-y-6">
-          <div className="flex items-center gap-3">
-            <BrandMark size={30} />
-            <div>
-              <h1 className="font-display text-lg font-semibold text-white">
-                First Super Admin Setup
-              </h1>
-              <p className="text-xs text-white/75">
-                Protected initial platform provisioning
-              </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <BrandMark size={30} />
+              <div>
+                <h1 className="font-display text-lg font-semibold text-white">
+                  First Super Admin Setup
+                </h1>
+                <p className="text-xs text-white/75">
+                  Protected initial platform provisioning
+                </p>
+              </div>
             </div>
+            <ThemeToggle variant="dark-header" />
           </div>
 
           {!setupStatus.bootstrapConfigured ? (
             <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
               <div className="rounded-xl border border-amber-500/40 bg-amber-950/40 p-4 text-amber-200 space-y-2">
-                <p className="font-semibold">Server Bootstrap Secret Required</p>
+                <p className="font-semibold">Server Secret Provisioning Required</p>
                 <p>
-                  No default passwords or tokens are shipped in code. To create the first Super Admin account, choose one of these two methods on the server:
+                  No default passwords or tokens are shipped in code. Configure your Super Admin credentials via server secrets using any of the options below:
                 </p>
               </div>
               <ol className="list-decimal pl-5 space-y-2">
                 <li>
-                  <strong>Environment Variable:</strong> Set{' '}
+                  <strong>Direct Super Admin Secrets:</strong> Set{' '}
+                  <code className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded">
+                    SUPER_ADMIN_EMAIL
+                  </code>{' '}
+                  and{' '}
+                  <code className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded">
+                    SUPER_ADMIN_PASSWORD
+                  </code>{' '}
+                  in your server environment variables / Secrets panel and restart the server.
+                </li>
+                <li>
+                  <strong>One-Time Bootstrap Secret:</strong> Set{' '}
                   <code className="font-mono text-white bg-slate-800 px-1.5 py-0.5 rounded">
                     BOOTSTRAP_ADMIN_SECRET
                   </code>{' '}
-                  in your server environment (or Secrets panel), restart the server, then refresh this page to create your Super Admin account.
+                  in your server environment, restart, then refresh this page to create your Super Admin account.
                 </li>
                 <li>
                   <strong>Server CLI:</strong> Run{' '}
@@ -719,11 +801,12 @@ export function PlatformAdminPortal({
               </div>
               <div>
                 <label className="block text-xs text-white/85 mb-1">
-                  Strong Password (min 12 chars, upper, lower, digit, symbol)
+                  Strong Password (min 8 chars, upper, lower, digit, symbol)
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={bootPassword}
                   onChange={(e) => setBootPassword(e.target.value)}
                   className="w-full min-h-[44px] rounded-lg border border-white/20 bg-[#06153F] px-3.5 text-sm text-white"
@@ -755,18 +838,21 @@ export function PlatformAdminPortal({
             <div className="bg-[#0B2B7E]" />
           </div>
           <div className="p-6 sm:p-8 space-y-5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
-              <Lock className="w-4 h-4 text-[#D41118]" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+                <Lock className="w-4 h-4 text-[#D41118]" />
+              </div>
+              <div>
+                <h1 className="font-display text-lg font-semibold text-white">
+                  Platform Administration Sign In
+                </h1>
+                <p className="text-xs text-white/75">
+                  Restricted to authorized Platform Super Administrators
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-lg font-semibold text-white">
-                Platform Administration Sign In
-              </h1>
-              <p className="text-xs text-white/75">
-                Restricted to authorized Platform Super Administrators
-              </p>
-            </div>
+            <ThemeToggle variant="dark-header" />
           </div>
 
           {loginError && (
@@ -873,6 +959,7 @@ export function PlatformAdminPortal({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <ThemeToggle variant="dark-header" />
             <PWAInstallButton variant="dark-header" />
             <button
               type="button"
@@ -1052,6 +1139,11 @@ export function PlatformAdminPortal({
                     hint: 'Unset BOOTSTRAP_ADMIN_SECRET after first-admin setup.',
                   },
                   {
+                    label: 'Super Admin Secrets (SUPER_ADMIN_EMAIL / PASSWORD)',
+                    ok: Boolean(overview.securityReadiness.envSuperAdminConfigured),
+                    hint: 'Optional secret env vars to provision or rotate Super Admin email & password from host settings.',
+                  },
+                  {
                     label: 'SMTP Email Provider',
                     ok: overview.securityReadiness.smtpConfigured,
                     hint: 'Set SMTP_HOST, SMTP_USER, SMTP_PASS for email alerts.',
@@ -1076,6 +1168,139 @@ export function PlatformAdminPortal({
                 ))}
               </div>
             </div>
+
+            {/* Super Admin Email & Password Management */}
+            <form
+              onSubmit={handleUpdateSuperAdminAccount}
+              className="bg-white border border-slate-200 rounded-xl p-5 space-y-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-[#0B2B7E]" />
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Super Admin Credentials (Email & Password)
+                  </h2>
+                </div>
+                <span className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 text-slate-700">
+                  {overview.securityReadiness.envSuperAdminConfigured
+                    ? 'Env Secrets Active (SUPER_ADMIN_EMAIL & SUPER_ADMIN_PASSWORD)'
+                    : 'Managed via Admin Console'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
+                Update the active Super Admin email, display name, or password at any time below. You can also configure{' '}
+                <code className="font-mono text-slate-900 bg-slate-100 px-1 py-0.5 rounded">
+                  SUPER_ADMIN_EMAIL
+                </code>{' '}
+                and{' '}
+                <code className="font-mono text-slate-900 bg-slate-100 px-1 py-0.5 rounded">
+                  SUPER_ADMIN_PASSWORD
+                </code>{' '}
+                as server secrets — whenever those environment secrets change, the Super Admin credentials synchronize automatically on startup.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={3}
+                    value={acctFullName}
+                    onChange={(e) => setAcctFullName(e.target.value)}
+                    className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Super Admin Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={acctEmail}
+                    onChange={(e) => setAcctEmail(e.target.value)}
+                    className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Current Password (Required)
+                  </label>
+                  <input
+                    type={acctShowPasswords ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={acctCurrentPassword}
+                    onChange={(e) => setAcctCurrentPassword(e.target.value)}
+                    placeholder="Verify current password"
+                    className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    New Password (Optional, min 8 chars)
+                  </label>
+                  <input
+                    type={acctShowPasswords ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    minLength={8}
+                    value={acctNewPassword}
+                    onChange={(e) => setAcctNewPassword(e.target.value)}
+                    placeholder="Leave blank to keep current"
+                    className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type={acctShowPasswords ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={acctConfirmPassword}
+                    onChange={(e) => setAcctConfirmPassword(e.target.value)}
+                    placeholder="Repeat new password"
+                    className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => setAcctShowPasswords((v) => !v)}
+                    className="min-h-[42px] px-3.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 inline-flex items-center gap-2"
+                  >
+                    {acctShowPasswords ? (
+                      <>
+                        <EyeOff className="w-4 h-4" />
+                        <span>Hide Passwords</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4" />
+                        <span>Show Passwords</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <span className="text-[11px] text-slate-500">
+                  Changing email or password signs out other active sessions automatically.
+                </span>
+                <button
+                  type="submit"
+                  disabled={acctSaving}
+                  className="min-h-[42px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-xs sm:text-sm font-medium disabled:opacity-60"
+                >
+                  {acctSaving ? 'Updating Credentials…' : 'Update Super Admin Credentials'}
+                </button>
+              </div>
+            </form>
 
             {/* Backups & Restore */}
             <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
@@ -1470,7 +1695,8 @@ export function PlatformAdminPortal({
                   <input
                     type="password"
                     required
-                    placeholder="Initial Password (min 12 chars, Aa1!)"
+                    minLength={8}
+                    placeholder="Initial Password (min 8 chars, Aa1!)"
                     value={invPassword}
                     onChange={(e) => setInvPassword(e.target.value)}
                     className="min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"

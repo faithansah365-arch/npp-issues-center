@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import QRCode from 'qrcode';
 import type { UserRecord } from '../../shared/types.ts';
-import { config, isSmtpConfigured } from '../config.ts';
+import { config, isEnvSuperAdminConfigured, isSmtpConfigured } from '../config.ts';
 import { store } from '../db/store.ts';
 import { setSessionCookie } from '../middleware/auth.ts';
 import { logAuditEvent } from '../security/audit.ts';
@@ -39,6 +39,7 @@ setupRouter.get('/status', async (_req, res) => {
   res.json({
     hasSuperAdmin,
     bootstrapConfigured: Boolean(config.bootstrapAdminSecret),
+    envSuperAdminConfigured: isEnvSuperAdminConfigured(),
     storageMode: store.getStorageMode(),
     smtpConfigured: isSmtpConfigured(),
   });

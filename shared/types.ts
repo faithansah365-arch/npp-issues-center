@@ -358,6 +358,7 @@ export interface SystemSettingsRecord {
     officerTrainingCompleted: boolean;
     breachResponsePlanActive: boolean;
   };
+  envAdminSyncDigest?: string | null;
   updatedByUserId: string | null;
   updatedAt: string;
 }

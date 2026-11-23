@@ -31,6 +31,8 @@ export const config = {
   encryptionKeyHex: (process.env.ENCRYPTION_KEY || '').trim() || runtimeFallbackEncryptionKey,
   hasPersistentEncryptionKey: Boolean((process.env.ENCRYPTION_KEY || '').trim()),
   bootstrapAdminSecret: (process.env.BOOTSTRAP_ADMIN_SECRET || '').trim(),
+  superAdminEmail: (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase(),
+  superAdminPassword: (process.env.SUPER_ADMIN_PASSWORD || '').trim(),
   smtp: {
     host: (process.env.SMTP_HOST || '').trim(),
     port: Number(process.env.SMTP_PORT || 587),
@@ -45,4 +47,8 @@ export const config = {
 
 export function isSmtpConfigured(): boolean {
   return Boolean(config.smtp.host && config.smtp.user && config.smtp.pass);
+}
+
+export function isEnvSuperAdminConfigured(): boolean {
+  return Boolean(config.superAdminEmail && config.superAdminPassword);
 }

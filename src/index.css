@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark, .dark *));
 
 @theme {
   --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
@@ -23,12 +24,210 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html.dark {
+    background-color: #0b1120;
+    color: #f1f5f9;
+  }
+
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
   }
 
   button, a, select, input, textarea, label {
     touch-action: manipulation;
+  }
+}
+
+/* System-wide dark-mode surface, border, typography, and form defaults.
+   Specificity is (0,1,0) via :where(html.dark), so explicit dark:* utilities
+   ((0,2,0)) always take precedence. */
+@layer utilities {
+  :where(html.dark) :where(body) {
+    background-color: #0b1120;
+    color: #f1f5f9;
+  }
+
+  :where(html.dark) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    border-color: #334155;
+  }
+
+  :where(html.dark) :where(input, textarea)::placeholder {
+    color: #64748b;
+  }
+
+  /* Page & card surfaces */
+  :where(html.dark) .bg-\[\#F7F9FC\] {
+    background-color: #0b1120;
+  }
+  :where(html.dark) .bg-white {
+    background-color: #111827;
+  }
+  :where(html.dark) .bg-white\/95 {
+    background-color: rgb(17 24 39 / 0.94);
+  }
+  :where(html.dark) .bg-slate-50 {
+    background-color: #172033;
+  }
+  :where(html.dark) .bg-slate-50\/70 {
+    background-color: rgb(23 32 51 / 0.72);
+  }
+  :where(html.dark) .bg-slate-100 {
+    background-color: #1e293b;
+  }
+  :where(html.dark) .hover\:bg-slate-50:hover {
+    background-color: #1e293b;
+  }
+  :where(html.dark) .hover\:bg-slate-100:hover {
+    background-color: #263449;
+  }
+  :where(html.dark) .bg-\[\#E6ECF7\] {
+    background-color: #162238;
+  }
+  :where(html.dark) .bg-\[\#EEF3FC\] {
+    background-color: #162646;
+  }
+  :where(html.dark) .bg-\[\#EEF3FC\]\/40 {
+    background-color: rgb(22 38 70 / 0.55);
+  }
+  :where(html.dark) .bg-\[\#EEF3FC\]\/65 {
+    background-color: rgb(22 38 70 / 0.75);
+  }
+  :where(html.dark) .bg-\[\#dfe9fa\],
+  :where(html.dark) .hover\:bg-\[\#dfe9fa\]:hover {
+    background-color: #1f335c;
+  }
+  :where(html.dark) .bg-\[\#FDF2F2\] {
+    background-color: rgb(127 29 29 / 0.28);
+  }
+  :where(html.dark) .bg-\[\#FCE5E6\],
+  :where(html.dark) .hover\:bg-\[\#FCE5E6\]:hover {
+    background-color: rgb(153 27 27 / 0.4);
+  }
+
+  /* Keep NPP Red-White-Blue 3-stripe bar white center intact */
+  :where(html.dark) .grid-cols-3 > .bg-white {
+    background-color: #ffffff;
+  }
+
+  /* Borders & dividers */
+  :where(html.dark) .border-slate-100,
+  :where(html.dark) .divide-slate-100 > :not(:last-child) {
+    border-color: #1e293b;
+  }
+  :where(html.dark) .border-slate-200,
+  :where(html.dark) .border-slate-200\/70,
+  :where(html.dark) .divide-slate-200 > :not(:last-child) {
+    border-color: #243247;
+  }
+  :where(html.dark) .border-slate-300 {
+    border-color: #334155;
+  }
+  :where(html.dark) .border-\[\#C7D4F2\] {
+    border-color: #2b457a;
+  }
+  :where(html.dark) .border-\[\#F5C6C8\] {
+    border-color: rgb(248 113 113 / 0.35);
+  }
+  :where(html.dark) .border-\[\#0B2B7E\]\/25,
+  :where(html.dark) .border-\[\#0B2B7E\]\/30 {
+    border-color: rgb(96 165 250 / 0.35);
+  }
+
+  /* Typography */
+  :where(html.dark) .text-slate-900 {
+    color: #f8fafc;
+  }
+  :where(html.dark) .text-slate-800 {
+    color: #e2e8f0;
+  }
+  :where(html.dark) .text-slate-700 {
+    color: #cbd5e1;
+  }
+  :where(html.dark) .text-slate-600 {
+    color: #94a3b8;
+  }
+  :where(html.dark) .text-slate-500 {
+    color: #94a3b8;
+  }
+  :where(html.dark) .hover\:text-slate-900:hover {
+    color: #ffffff;
+  }
+  :where(html.dark) .text-\[\#071A4D\] {
+    color: #dce8ff;
+  }
+  :where(html.dark) .text-\[\#071A4D\]\/75 {
+    color: rgb(220 232 255 / 0.78);
+  }
+  :where(html.dark) .text-\[\#071A4D\]\/80 {
+    color: rgb(220 232 255 / 0.85);
+  }
+  :where(html.dark) .hover\:text-\[\#071A4D\]:hover {
+    color: #ffffff;
+  }
+  :where(html.dark) .text-\[\#0B2B7E\],
+  :where(html.dark) .hover\:text-\[\#0B2B7E\]:hover {
+    color: #93c5fd;
+  }
+  :where(html.dark) .text-\[\#B30E14\] {
+    color: #fda4af;
+  }
+  :where(html.dark) .text-\[\#A60D13\] {
+    color: #fecdd3;
+  }
+  :where(html.dark) .text-\[\#D41118\] {
+    color: #f87171;
+  }
+
+  /* Status & alert tints */
+  :where(html.dark) .bg-red-50,
+  :where(html.dark) .hover\:bg-red-50:hover {
+    background-color: rgb(127 29 29 / 0.3);
+  }
+  :where(html.dark) .border-red-200 {
+    border-color: rgb(248 113 113 / 0.35);
+  }
+  :where(html.dark) .text-red-800,
+  :where(html.dark) .text-red-700,
+  :where(html.dark) .hover\:text-red-800:hover {
+    color: #fecaca;
+  }
+
+  :where(html.dark) .bg-amber-50,
+  :where(html.dark) .bg-amber-50\/50 {
+    background-color: rgb(120 53 15 / 0.3);
+  }
+  :where(html.dark) .border-amber-200,
+  :where(html.dark) .border-amber-300 {
+    border-color: rgb(251 191 36 / 0.38);
+  }
+  :where(html.dark) .text-amber-950,
+  :where(html.dark) .text-amber-900,
+  :where(html.dark) .text-amber-800 {
+    color: #fde68a;
+  }
+
+  :where(html.dark) .bg-emerald-50,
+  :where(html.dark) .bg-emerald-50\/50 {
+    background-color: rgb(6 78 59 / 0.32);
+  }
+  :where(html.dark) .border-emerald-200 {
+    border-color: rgb(52 211 153 / 0.35);
+  }
+  :where(html.dark) .text-emerald-900,
+  :where(html.dark) .text-emerald-700 {
+    color: #a7f3d0;
+  }
+
+  :where(html.dark) .bg-blue-50 {
+    background-color: rgb(30 58 138 / 0.32);
+  }
+  :where(html.dark) .border-blue-200 {
+    border-color: rgb(96 165 250 / 0.35);
+  }
+  :where(html.dark) .text-blue-800 {
+    color: #bfdbfe;
   }
 }
 

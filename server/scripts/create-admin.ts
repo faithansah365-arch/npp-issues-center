@@ -27,7 +27,7 @@ async function main() {
     console.log('\n=== NPP Issue Portal — First Super Admin CLI Bootstrap ===\n');
     const fullName = (await rl.question('Full Name: ')).trim();
     const email = (await rl.question('Admin Email: ')).trim().toLowerCase();
-    const password = await rl.question('Strong Password (min 12 chars, upper/lower/digit/symbol): ');
+    const password = await rl.question('Strong Password (min 8 chars, upper/lower/digit/symbol): ');
 
     const pwdErr = validatePasswordStrength(password);
     if (pwdErr) {

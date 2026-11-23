@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../lib/api';
 import { BrandMark } from './BrandMark';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ThemeToggle } from './ThemeToggle';
 
 interface SetupStatus {
   hasSuperAdmin: boolean;
@@ -328,7 +329,12 @@ export function AuthScreen() {
       if (res.roleMismatchNotice) {
         setLoginNotice(res.roleMismatchNotice);
       }
-      await refreshSession();
+      const me = await refreshSession();
+      if (!me) {
+        setLoginError(
+          'Your credentials were verified, but your browser blocked the session cookie inside this preview frame. Please open the app directly in a new browser tab or allow cookies for this site.',
+        );
+      }
     } catch (err) {
       setLoginError((err as Error).message);
     } finally {
@@ -410,7 +416,12 @@ export function AuthScreen() {
         },
       );
       window.history.replaceState({}, '', '/');
-      await refreshSession();
+      const me = await refreshSession();
+      if (!me) {
+        setInviteError(
+          'Your account was activated, but your browser blocked the session cookie inside this preview frame. Open the app directly in a new tab to sign in.',
+        );
+      }
     } catch (err) {
       setInviteError((err as Error).message);
     } finally {
@@ -479,6 +490,7 @@ export function AuthScreen() {
           </nav>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <ThemeToggle variant="light" />
             <PWAInstallButton variant="header" />
             <button
               type="button"
@@ -1069,11 +1081,12 @@ export function AuthScreen() {
 
                     <div className="space-y-1">
                       <label className="block text-xs font-medium text-slate-700">
-                        Password (min 12 chars, upper, lower, digit, symbol)
+                        Password (min 8 chars, upper, lower, digit, symbol)
                       </label>
                       <input
                         type="password"
                         required
+                        minLength={8}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-sm"
@@ -1185,11 +1198,12 @@ export function AuthScreen() {
                       <form onSubmit={handleInviteActivate} className="space-y-4">
                         <div className="space-y-1.5">
                           <label className="block text-xs font-medium text-slate-700">
-                            New Password (min 12 chars, upper, lower, digit, symbol)
+                            New Password (min 8 chars, upper, lower, digit, symbol)
                           </label>
                           <input
                             type="password"
                             required
+                            minLength={8}
                             value={invitePassword}
                             onChange={(e) => setInvitePassword(e.target.value)}
                             className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
@@ -1236,11 +1250,12 @@ export function AuthScreen() {
                     )}
                     <div className="space-y-1.5">
                       <label className="block text-xs font-medium text-slate-700">
-                        New Password (min 12 chars, upper, lower, digit, symbol)
+                        New Password (min 8 chars, upper, lower, digit, symbol)
                       </label>
                       <input
                         type="password"
                         required
+                        minLength={8}
                         value={resetNewPwd}
                         onChange={(e) => setResetNewPwd(e.target.value)}
                         className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"

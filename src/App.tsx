@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import type { IssueLevel } from '../shared/types';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import type { ExecutiveTab, SuperAdminWorkspace } from './components/PortalShell';
@@ -186,9 +187,11 @@ function AppRouter() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRouter />
-      <OfflineIndicator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppRouter />
+        <OfflineIndicator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

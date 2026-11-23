@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient, type Collection, type Db } from 'mongodb';
@@ -19,7 +20,8 @@ import {
   type SystemSettingsRecord,
   type UserRecord,
 } from '../../shared/types.ts';
-import { config } from '../config.ts';
+import { config, isEnvSuperAdminConfigured } from '../config.ts';
+import { hashPassword, sha256 } from '../security/crypto.ts';
 import {
   EC_GHANA_CONSTITUENCIES,
   GHANA_REGIONS,
@@ -335,7 +337,86 @@ class DataStore {
       }
     }
 
+    await this.syncEnvSuperAdmin();
+
     this.persistDev();
+  }
+
+  private async syncEnvSuperAdmin(): Promise<void> {
+    if (!isEnvSuperAdminConfigured()) return;
+    const envEmail = config.superAdminEmail;
+    const envPassword = config.superAdminPassword;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(envEmail) || envPassword.length < 8) {
+      console.warn(
+        '[auth] SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD is invalid (requires valid email and >= 8 char password); skipping env sync.',
+      );
+      return;
+    }
+
+    const digest = sha256(`${envEmail}:::${envPassword}`);
+    const settings = (await this.getSettings()) || createDefaultSettings();
+    const users = await this.listUsers();
+    const admins = users.filter((u) => u.role === 'SUPER_ADMIN');
+
+    if (admins.length === 0) {
+      const conflict = await this.getUserByEmail(envEmail);
+      if (conflict) {
+        console.warn(`[auth] Cannot seed env Super Admin: ${envEmail} already belongs to another account.`);
+        return;
+      }
+      const now = new Date().toISOString();
+      const adminId = crypto.randomUUID();
+      await this.saveUser({
+        id: adminId,
+        fullName: 'Platform Super Administrator',
+        email: envEmail,
+        titleOrOffice: 'Platform Super Administrator',
+        role: 'SUPER_ADMIN',
+        status: 'ACTIVE',
+        regionId: null,
+        constituencyId: null,
+        pollingStationId: null,
+        passwordHash: await hashPassword(envPassword),
+        mfaEnabled: false,
+        mfaSecretEncrypted: null,
+        mfaBackupCodeHashes: [],
+        lastTotpStepUsed: null,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: null,
+        invitedByUserId: null,
+        approvedByUserId: adminId,
+        approvedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      settings.envAdminSyncDigest = digest;
+      settings.updatedAt = now;
+      await this.saveSettings(settings);
+      return;
+    }
+
+    if (settings.envAdminSyncDigest !== digest) {
+      const primary = admins.find((u) => u.status === 'ACTIVE') || admins[0];
+      const conflict = await this.getUserByEmail(envEmail);
+      if (!conflict || conflict.id === primary.id) {
+        primary.email = envEmail;
+      } else {
+        console.warn(`[auth] SUPER_ADMIN_EMAIL ${envEmail} conflicts with another user; password synced only.`);
+      }
+      const now = new Date().toISOString();
+      primary.passwordHash = await hashPassword(envPassword);
+      primary.status = 'ACTIVE';
+      primary.failedLoginAttempts = 0;
+      primary.lockedUntil = null;
+      primary.updatedAt = now;
+      await this.saveUser(primary);
+      await this.revokeAllSessionsForUser(primary.id);
+
+      settings.envAdminSyncDigest = digest;
+      settings.updatedAt = now;
+      await this.saveSettings(settings);
+    }
   }
 
   // Users
@@ -441,6 +522,25 @@ class DataStore {
     }
     for (const s of this.devState.sessions) {
       if (s.userId === userId && !s.revokedAt) {
+        s.revokedAt = now;
+      }
+    }
+    this.persistDev();
+  }
+
+  async revokeOtherSessionsForUser(userId: string, keepSessionId?: string): Promise<void> {
+    const now = new Date().toISOString();
+    if (this.mode === 'mongodb_atlas') {
+      await this.col<SessionRecord>('sessions').updateMany(
+        keepSessionId
+          ? { userId, revokedAt: null, id: { $ne: keepSessionId } }
+          : { userId, revokedAt: null },
+        { $set: { revokedAt: now } },
+      );
+      return;
+    }
+    for (const s of this.devState.sessions) {
+      if (s.userId === userId && !s.revokedAt && s.id !== keepSessionId) {
         s.revokedAt = now;
       }
     }
