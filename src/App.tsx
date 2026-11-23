@@ -71,7 +71,7 @@ function AppRouter() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-6 text-sm font-medium text-[#071A4D]">
+      <div className="min-h-dvh bg-[#F7F9FC] flex items-center justify-center p-6 text-sm font-medium text-[#071A4D]">
         Loading NPP Internal Issue Portal…
       </div>
     );

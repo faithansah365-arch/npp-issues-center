@@ -90,7 +90,7 @@ export function PortalShell({
   ];
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col lg:flex-row">
+    <div className="min-h-dvh bg-[#F7F9FC] flex flex-col lg:flex-row">
       {/* Desktop Sidebar (260px) */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-30">
         <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
@@ -194,9 +194,9 @@ export function PortalShell({
       </aside>
 
       {/* Main Column */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-dvh">
         {/* Top Bar: 3 zones on desktop, compact 52px on mobile */}
-        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200">
+        <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-slate-200 safe-pt">
           <div className="lg:hidden grid grid-cols-3 h-1 w-full" aria-hidden="true">
             <div className="bg-[#D41118]" />
             <div className="bg-white border-b border-slate-200/70" />
@@ -271,7 +271,7 @@ export function PortalShell({
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-6 pb-24 lg:pb-10">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 py-4 sm:py-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pb-10">
           {children}
         </main>
       </div>
@@ -290,19 +290,21 @@ export function PortalShell({
                 key={item.id}
                 type="button"
                 onClick={() => onTabChange(item.id)}
-                className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 relative ${
+                className={`h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 relative active:scale-95 transition-transform ${
                   active ? 'text-[#0B2B7E] font-semibold' : 'text-slate-500'
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <span className="relative inline-flex">
+                  <Icon className="w-5 h-5" />
+                  {typeof item.badge === 'number' && item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#D41118] text-white text-[10px] font-mono tabular-nums font-bold flex items-center justify-center">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[11px] tracking-tight whitespace-nowrap">
                   {item.shortLabel}
                 </span>
-                {typeof item.badge === 'number' && item.badge > 0 && (
-                  <span className="absolute top-1.5 right-4 text-[10px] font-mono tabular-nums font-bold text-[#D41118]">
-                    {item.badge}
-                  </span>
-                )}
               </button>
             );
           })}

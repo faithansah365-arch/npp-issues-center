@@ -174,13 +174,13 @@ export function IssueFormModal({
       aria-modal="true"
       aria-labelledby="issue-form-title"
     >
-      <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[92dvh] flex flex-col overflow-hidden">
         <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
           <div className="bg-[#D41118]" />
           <div className="bg-white border-b border-slate-200/70" />
           <div className="bg-[#0B2B7E]" />
         </div>
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h2 id="issue-form-title" className="font-display text-lg font-semibold text-[#071A4D]">
               Submit Party Meeting Concern
@@ -194,14 +194,14 @@ export function IssueFormModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 shrink-0"
             aria-label="Close issue form"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto ios-scroll p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6 space-y-5">
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800">
               {error}
@@ -232,7 +232,7 @@ export function IssueFormModal({
                       const firstPs = stations.find((s) => s.constituencyId === firstCon)?.id || '';
                       setSelectedStationId(firstPs);
                     }}
-                    className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 disabled:bg-slate-100"
+                    className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 disabled:bg-slate-100"
                   >
                     <option value="">Select Region</option>
                     {regions.map((r) => (
@@ -251,7 +251,7 @@ export function IssueFormModal({
                       const firstPs = stations.find((s) => s.constituencyId === nextCon)?.id || '';
                       setSelectedStationId(firstPs);
                     }}
-                    className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 disabled:bg-slate-100"
+                    className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 disabled:bg-slate-100"
                   >
                     <option value="">Select Constituency</option>
                     {filteredConstituencies.map((c) => (
@@ -267,7 +267,7 @@ export function IssueFormModal({
                     required
                     value={selectedStationId}
                     onChange={(e) => setSelectedStationId(e.target.value)}
-                    className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
+                    className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
                   >
                     {filteredStations.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -287,14 +287,14 @@ export function IssueFormModal({
                       value={newStationName}
                       onChange={(e) => setNewStationName(e.target.value)}
                       placeholder="Polling station name (e.g. Central Market Presby)"
-                      className="sm:col-span-2 min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
+                      className="sm:col-span-2 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
                     />
                     <input
                       type="text"
                       value={newStationCode}
                       onChange={(e) => setNewStationCode(e.target.value)}
                       placeholder="EC Code (optional)"
-                      className="min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
+                      className="min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900"
                     />
                   </div>
                 )}
@@ -338,7 +338,7 @@ export function IssueFormModal({
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <label htmlFor="issue-meeting-date" className="block text-xs font-medium text-slate-700">
                 Meeting Date
               </label>
@@ -348,7 +348,7 @@ export function IssueFormModal({
                 required
                 value={meetingDate}
                 onChange={(e) => setMeetingDate(e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
+                className="w-full min-w-0 min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
               />
             </div>
           </div>
@@ -433,7 +433,7 @@ export function IssueFormModal({
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <label htmlFor="issue-followup" className="block text-xs font-medium text-slate-700">
                 Follow-Up Date (Optional)
               </label>
@@ -442,7 +442,7 @@ export function IssueFormModal({
                 type="date"
                 value={followUpDate}
                 onChange={(e) => setFollowUpDate(e.target.value)}
-                className="w-full min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
+                className="w-full min-w-0 min-h-[44px] rounded-lg border border-slate-300 px-3.5 text-sm"
               />
             </div>
           </div>

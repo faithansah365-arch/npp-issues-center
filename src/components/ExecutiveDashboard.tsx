@@ -217,22 +217,22 @@ export function ExecutiveDashboard({
           aria-label="Scope Analytics Filters"
           className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5"
         >
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-slate-600 mb-1">From Date</label>
             <input
               type="date"
               value={filters.fromDate}
               onChange={(e) => onFiltersChange({ ...filters, fromDate: e.target.value })}
-              className="w-full min-h-[40px] rounded-lg border border-slate-300 px-3 text-xs"
+              className="w-full min-w-0 min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 px-3 text-xs"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-slate-600 mb-1">To Date</label>
             <input
               type="date"
               value={filters.toDate}
               onChange={(e) => onFiltersChange({ ...filters, toDate: e.target.value })}
-              className="w-full min-h-[40px] rounded-lg border border-slate-300 px-3 text-xs"
+              className="w-full min-w-0 min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 px-3 text-xs"
             />
           </div>
           {regions.length > 1 && (
@@ -385,17 +385,17 @@ export function ExecutiveDashboard({
       {analytics && (
         <>
           {/* Primary KPI Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => onNavigateQueue({ status: '' })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#0B2B7E]/40 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-3.5 sm:p-5 hover:border-[#0B2B7E]/40 active:bg-slate-50 transition-colors"
             >
               <p className="text-xs font-medium text-slate-500">Open Issues</p>
-              <p className="font-display text-3xl font-semibold text-[#071A4D] tabular-nums mt-2">
+              <p className="font-display text-2xl sm:text-3xl font-semibold text-[#071A4D] tabular-nums mt-1.5 sm:mt-2">
                 {analytics.openIssues}
               </p>
-              <p className="text-xs text-slate-500 mt-1 tabular-nums">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1 tabular-nums">
                 Out of {analytics.totalInScope} total in scope
               </p>
             </button>
@@ -403,42 +403,42 @@ export function ExecutiveDashboard({
             <button
               type="button"
               onClick={() => onNavigateQueue({ priority: 'Urgent' })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#D41118]/40 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-3.5 sm:p-5 hover:border-[#D41118]/40 active:bg-slate-50 transition-colors"
             >
               <p className="text-xs font-semibold text-[#B30E14]">Urgent Open</p>
-              <p className="font-display text-3xl font-semibold text-[#D41118] tabular-nums mt-2">
+              <p className="font-display text-2xl sm:text-3xl font-semibold text-[#D41118] tabular-nums mt-1.5 sm:mt-2">
                 {analytics.urgentIssues}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Immediate attention priority</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1">Immediate attention priority</p>
             </button>
 
             <button
               type="button"
               onClick={() => onNavigateQueue({ essentialOnly: true })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#0B2B7E]/40 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-3.5 sm:p-5 hover:border-[#0B2B7E]/40 active:bg-slate-50 transition-colors"
             >
               <p className="text-xs font-semibold text-[#0B2B7E]">Essential Tag</p>
-              <p className="font-display text-3xl font-semibold text-[#0B2B7E] tabular-nums mt-2">
+              <p className="font-display text-2xl sm:text-3xl font-semibold text-[#0B2B7E] tabular-nums mt-1.5 sm:mt-2">
                 {analytics.essentialIssues}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Core party & operational matters</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1">Core party & operational matters</p>
             </button>
 
             <button
               type="button"
               onClick={() => onNavigateQueue({ overdueOnly: true })}
-              className="text-left bg-white border border-slate-200 rounded-xl p-5 hover:border-[#D41118]/40 transition-colors"
+              className="text-left bg-white border border-slate-200 rounded-xl p-3.5 sm:p-5 hover:border-[#D41118]/40 active:bg-slate-50 transition-colors"
             >
               <p className="text-xs font-semibold text-[#B30E14]">Overdue Follow-Ups</p>
-              <p className="font-display text-3xl font-semibold text-[#B30E14] tabular-nums mt-2">
+              <p className="font-display text-2xl sm:text-3xl font-semibold text-[#B30E14] tabular-nums mt-1.5 sm:mt-2">
                 {analytics.overdueFollowUps}
               </p>
-              <p className="text-xs text-slate-500 mt-1">Past scheduled follow-up date</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1">Past scheduled follow-up date</p>
             </button>
           </div>
 
           {/* Secondary Performance Metrics Strip */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <p className="text-xs text-slate-500">Avg. Time to First Response</p>
               <p className="font-mono text-xl font-semibold text-slate-900 tabular-nums mt-1">

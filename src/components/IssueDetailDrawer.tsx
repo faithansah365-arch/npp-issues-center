@@ -259,14 +259,14 @@ export function IssueDetailDrawer({
       aria-modal="true"
       aria-label="Issue Detail Dossier"
     >
-      <div className="bg-white w-full max-w-3xl h-full flex flex-col border-l border-slate-200 overflow-hidden">
+      <div className="bg-white w-full max-w-3xl h-dvh max-h-dvh flex flex-col border-l border-slate-200 overflow-hidden safe-pt">
         <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
           <div className="bg-[#D41118]" />
           <div className="bg-white border-b border-slate-200/70" />
           <div className="bg-[#0B2B7E]" />
         </div>
         {/* Sticky Drawer Header */}
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-white">
+        <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
           <div className="min-w-0">
             <p className="text-xs font-mono text-slate-600 truncate">
               {issue?.referenceCode || 'Loading…'}
@@ -285,7 +285,7 @@ export function IssueDetailDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-6 pb-[calc(1.75rem+env(safe-area-inset-bottom))] space-y-6">
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
               {error}
@@ -366,11 +366,11 @@ export function IssueDetailDrawer({
                         <a
                           key={att.id}
                           href={`/api/issues/${issue.id}/attachments/${att.id}`}
-                          className="min-h-[40px] px-3.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-800 inline-flex items-center gap-2"
+                          className="min-h-[44px] max-w-full px-3.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-800 inline-flex items-center gap-2"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>{att.originalName}</span>
-                          <span className="font-mono text-slate-500 tabular-nums">
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{att.originalName}</span>
+                          <span className="font-mono text-slate-500 tabular-nums shrink-0">
                             ({Math.round(att.sizeBytes / 1024)} KB)
                           </span>
                         </a>
@@ -403,7 +403,7 @@ export function IssueDetailDrawer({
                           setWorkflowAction(workflowAction === 'escalate' ? null : 'escalate');
                           setActionText('');
                         }}
-                        className="min-h-[42px] px-4 rounded-lg border border-[#F5C6C8] bg-[#FDF2F2] text-[#A60D13] text-xs font-semibold hover:bg-[#FCE5E6] inline-flex items-center gap-1.5"
+                        className="min-h-[44px] px-4 rounded-lg border border-[#F5C6C8] bg-[#FDF2F2] text-[#A60D13] text-xs font-semibold hover:bg-[#FCE5E6] inline-flex items-center gap-1.5"
                       >
                         <ArrowUpRight className="w-4 h-4" />
                         <span>
@@ -422,7 +422,7 @@ export function IssueDetailDrawer({
                         setWorkflowAction(workflowAction === 'resolve' ? null : 'resolve');
                         setActionText('');
                       }}
-                      className="min-h-[42px] px-4 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 text-xs font-semibold hover:bg-emerald-100 inline-flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 text-xs font-semibold hover:bg-emerald-100 inline-flex items-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Resolve Issue</span>
@@ -433,7 +433,7 @@ export function IssueDetailDrawer({
                         setWorkflowAction(workflowAction === 'close' ? null : 'close');
                         setActionText('');
                       }}
-                      className="min-h-[42px] px-4 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1.5"
                     >
                       <XCircle className="w-4 h-4" />
                       <span>Close with Reason</span>
@@ -523,7 +523,7 @@ export function IssueDetailDrawer({
                       <select
                         value={editStatus}
                         onChange={(e) => setEditStatus(e.target.value as IssueStatus)}
-                        className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
+                        className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
                       >
                         {['New', 'Under review', 'Assigned', 'Awaiting update'].map((s) => (
                           <option key={s} value={s}>
@@ -540,7 +540,7 @@ export function IssueDetailDrawer({
                       <select
                         value={editOwner}
                         onChange={(e) => setEditOwner(e.target.value)}
-                        className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
+                        className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
                       >
                         <option value="">Unassigned</option>
                         {assignables.map((u) => (
@@ -555,7 +555,7 @@ export function IssueDetailDrawer({
                       <select
                         value={editPriority}
                         onChange={(e) => setEditPriority(e.target.value as IssuePriority)}
-                        className="w-full min-h-[42px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
+                        className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-xs"
                       >
                         {ISSUE_PRIORITIES.map((p) => (
                           <option key={p} value={p}>
@@ -564,7 +564,7 @@ export function IssueDetailDrawer({
                         ))}
                       </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="block text-xs font-medium text-slate-600 mb-1">
                         Follow-Up Date
                       </label>
@@ -572,10 +572,10 @@ export function IssueDetailDrawer({
                         type="date"
                         value={editFollowUp}
                         onChange={(e) => setEditFollowUp(e.target.value)}
-                        className="w-full min-h-[42px] rounded-lg border border-slate-300 px-3 text-xs"
+                        className="w-full min-w-0 min-h-[44px] rounded-lg border border-slate-300 px-3 text-xs"
                       />
                     </div>
-                    <label className="sm:col-span-2 min-h-[42px] px-3 rounded-lg border border-slate-300 flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer">
+                    <label className="sm:col-span-2 min-h-[44px] px-3 rounded-lg border border-slate-300 flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={editEssential}
@@ -588,14 +588,14 @@ export function IssueDetailDrawer({
                 )}
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <label className="text-xs font-medium text-slate-600">
                       Record Note or Action Taken
                     </label>
                     <select
                       value={noteType}
                       onChange={(e) => setNoteType(e.target.value as 'NOTE' | 'ACTION_TAKEN')}
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                      className="min-h-[38px] rounded border border-slate-300 bg-white px-2.5 py-1 text-xs"
                     >
                       <option value="ACTION_TAKEN">Action Taken</option>
                       <option value="NOTE">Internal Note</option>

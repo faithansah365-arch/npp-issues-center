@@ -452,9 +452,9 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC] flex flex-col justify-between">
+    <div className="min-h-dvh bg-[#F7F9FC] flex flex-col justify-between">
       {/* Clean 3-Zone Top Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xs">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xs safe-pt">
         <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
           <div className="bg-[#D41118]" />
           <div className="bg-white border-b border-slate-200/70" />
@@ -535,7 +535,7 @@ export function AuthScreen() {
           onMouseEnter={() => setSliderPaused(true)}
           onMouseLeave={() => setSliderPaused(false)}
         >
-          <div className="relative aspect-[16/10] sm:aspect-[16/8.2] w-full rounded-2xl overflow-hidden bg-[#071A4D] border border-slate-200">
+          <div className="relative aspect-[4/3] sm:aspect-[16/8.2] w-full rounded-2xl overflow-hidden bg-[#071A4D] border border-slate-200">
             {activeSlide ? (
               <AnimatePresence mode="wait">
                 <motion.div
@@ -641,7 +641,7 @@ export function AuthScreen() {
         {/* Clean Editorial About Section */}
         <section
           id="about"
-          className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start"
+          className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start"
         >
           <div className="lg:col-span-7 space-y-5">
             <div className="space-y-2.5">
@@ -655,11 +655,11 @@ export function AuthScreen() {
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
               Guided by the motto <em>Development in Freedom</em>, the New Patriotic Party brings together party officers and community organizers across all 16 regions and 276 parliamentary constituencies to address local concerns, strengthen grassroots organization, and deliver accountable action.
             </p>
-            <div className="pt-2 flex flex-wrap items-center gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => openAuthDialog('login')}
-                className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                className="min-h-[44px] px-5 rounded-lg bg-[#0B2B7E] hover:bg-[#071E5C] text-white text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Executive Sign In</span>
@@ -667,12 +667,12 @@ export function AuthScreen() {
               <button
                 type="button"
                 onClick={() => openAuthDialog('signup')}
-                className="min-h-[44px] px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                className="min-h-[44px] px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[#071A4D] text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Request Access / Sign Up</span>
               </button>
-              <PWAInstallButton variant="cta" />
+              <PWAInstallButton variant="cta" className="justify-center" />
             </div>
           </div>
 
@@ -701,7 +701,7 @@ export function AuthScreen() {
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
+      <footer className="border-t border-slate-200 bg-white safe-pb">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
           <span className="font-medium text-[#071A4D]">New Patriotic Party · Ghana</span>
           <div className="flex items-center gap-4">
@@ -741,7 +741,7 @@ export function AuthScreen() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full sm:max-w-md bg-white border border-slate-200 rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-xl max-h-[92dvh] overflow-y-auto safe-pb sm:my-auto"
+              className="w-full sm:max-w-md bg-white border border-slate-200 rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-xl max-h-[92dvh] overflow-y-auto ios-scroll pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-0 sm:my-auto"
             >
               <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
                 <div className="bg-[#D41118]" />
@@ -749,7 +749,7 @@ export function AuthScreen() {
                 <div className="bg-[#0B2B7E]" />
               </div>
 
-              <div className="p-6 sm:p-8">
+              <div className="p-5 sm:p-8">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div>
                     <p className="text-[11px] font-semibold text-[#B30E14] tracking-wide uppercase">
@@ -785,7 +785,7 @@ export function AuthScreen() {
                         setMode('login');
                         setLoginError(null);
                       }}
-                      className={`min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
+                      className={`min-h-[42px] sm:min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
                         mode === 'login'
                           ? 'bg-white text-[#071A4D] shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
@@ -799,7 +799,7 @@ export function AuthScreen() {
                         setMode('signup');
                         setLoginError(null);
                       }}
-                      className={`min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
+                      className={`min-h-[42px] sm:min-h-[38px] rounded-lg text-xs font-semibold transition-colors ${
                         mode === 'signup'
                           ? 'bg-white text-[#071A4D] shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'

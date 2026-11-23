@@ -684,7 +684,7 @@ export function PlatformAdminPortal({
 
   if (authLoading || statusLoading) {
     return (
-      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-6 text-sm text-[#071A4D]">
+      <div className="min-h-dvh bg-[#F7F9FC] flex items-center justify-center p-6 text-sm text-[#071A4D]">
         Verifying platform administration state…
       </div>
     );
@@ -693,7 +693,7 @@ export function PlatformAdminPortal({
   // Case 1: Zero Super Admins exist -> Secure First-Admin Bootstrap
   if (setupStatus && !setupStatus.hasSuperAdmin) {
     return (
-      <div className="min-h-screen bg-[#071A4D] text-slate-100 flex items-center justify-center p-4 sm:p-8">
+      <div className="min-h-dvh bg-[#071A4D] text-slate-100 flex items-center justify-center p-4 sm:p-8 safe-pt safe-pb">
         <div className="w-full max-w-lg bg-[#09205E] border border-white/15 rounded-2xl overflow-hidden shadow-xl">
           <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
             <div className="bg-[#D41118]" />
@@ -830,7 +830,7 @@ export function PlatformAdminPortal({
   // Case 2: Not signed in -> Dedicated Platform Admin Sign In
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#071A4D] text-slate-100 flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-[#071A4D] text-slate-100 flex items-center justify-center p-4 safe-pt safe-pb">
         <div className="w-full max-w-md bg-[#09205E] border border-white/15 rounded-2xl overflow-hidden shadow-xl">
           <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
             <div className="bg-[#D41118]" />
@@ -899,7 +899,7 @@ export function PlatformAdminPortal({
   // Case 3: Signed in as Executive (NOT SUPER_ADMIN) -> Backend & Frontend 403 Deny
   if (user.role !== 'SUPER_ADMIN') {
     return (
-      <div className="min-h-screen bg-[#F7F9FC] flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-[#F7F9FC] flex items-center justify-center p-4 safe-pt safe-pb">
         <div className="max-w-md w-full bg-white border border-[#F5C6C8] rounded-2xl overflow-hidden text-center">
           <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
             <div className="bg-[#D41118]" />
@@ -939,8 +939,8 @@ export function PlatformAdminPortal({
   const pendingApprovalUsers = users.filter((u) => u.status === 'PENDING_APPROVAL');
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC]">
-      <header className="bg-[#071A4D] text-white border-b border-[#0B2B7E]">
+    <div className="min-h-dvh bg-[#F7F9FC] safe-pb">
+      <header className="bg-[#071A4D] text-white border-b border-[#0B2B7E] safe-pt">
         <div className="grid grid-cols-3 h-1.5 w-full" aria-hidden="true">
           <div className="bg-[#D41118]" />
           <div className="bg-white" />
@@ -1008,9 +1008,9 @@ export function PlatformAdminPortal({
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
         {/* Sub-Navigation */}
-        <nav className="flex items-center gap-1 p-1 bg-[#E6ECF7] rounded-xl overflow-x-auto">
+        <nav className="flex items-center gap-1 p-1 bg-[#E6ECF7] rounded-xl overflow-x-auto no-scrollbar ios-scroll">
           {[
             { id: 'overview', label: 'Readiness & Backups' },
             { id: 'gallery', label: 'Homepage Images' },

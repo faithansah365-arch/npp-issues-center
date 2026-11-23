@@ -58,6 +58,13 @@
     textarea {
       font-size: 16px;
     }
+
+    input[type="date"] {
+      min-width: 0;
+      max-width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+    }
   }
 }
 
@@ -287,8 +294,26 @@
   animation: nppBaseFadeIn 0.35s ease 0.42s both;
 }
 
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+
 .safe-pb {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

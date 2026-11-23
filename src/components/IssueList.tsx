@@ -140,7 +140,7 @@ export function IssueList({
         </div>
 
         {/* Segmented Queue Tabs (interactive button controls) */}
-        <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg overflow-x-auto no-scrollbar ios-scroll">
           {[
             { id: 'all', label: 'All Scoped' },
             {
@@ -158,7 +158,7 @@ export function IssueList({
               key={tab.id}
               type="button"
               onClick={() => applySegment(tab.id as typeof queueMode)}
-              className={`min-h-[36px] px-3 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`min-h-[40px] sm:min-h-[36px] px-3 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                 queueMode === tab.id
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -217,7 +217,7 @@ export function IssueList({
                   pollingStationId: '',
                 })
               }
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+              className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
             >
               <option value="">All Regions</option>
               {regions.map((r) => (
@@ -238,7 +238,7 @@ export function IssueList({
                   pollingStationId: '',
                 })
               }
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+              className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
             >
               <option value="">All Constituencies</option>
               {filteredConstituencies.map((c) => (
@@ -253,7 +253,7 @@ export function IssueList({
               aria-label="Filter by polling station"
               value={filters.pollingStationId}
               onChange={(e) => onFiltersChange({ ...filters, pollingStationId: e.target.value })}
-              className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+              className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
             >
               <option value="">All Stations</option>
               {filteredStations.map((p) => (
@@ -267,7 +267,7 @@ export function IssueList({
             aria-label="Filter by category"
             value={filters.categoryId}
             onChange={(e) => onFiltersChange({ ...filters, categoryId: e.target.value })}
-            className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+            className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
           >
             <option value="">All Categories</option>
             {categories.map((c) => (
@@ -280,7 +280,7 @@ export function IssueList({
             aria-label="Filter by priority"
             value={filters.priority}
             onChange={(e) => onFiltersChange({ ...filters, priority: e.target.value })}
-            className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+            className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
           >
             <option value="">All Priorities</option>
             {ISSUE_PRIORITIES.map((p) => (
@@ -293,7 +293,7 @@ export function IssueList({
             aria-label="Filter by status"
             value={filters.status}
             onChange={(e) => onFiltersChange({ ...filters, status: e.target.value })}
-            className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+            className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
           >
             <option value="">All Statuses</option>
             {ISSUE_STATUSES.map((s) => (
@@ -306,7 +306,7 @@ export function IssueList({
             aria-label="Filter by assigned owner"
             value={filters.assignedToUserId}
             onChange={(e) => onFiltersChange({ ...filters, assignedToUserId: e.target.value })}
-            className="min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
+            className="min-h-[44px] sm:min-h-[40px] rounded-lg border border-slate-300 bg-white px-2.5 text-xs"
           >
             <option value="">Any Owner</option>
             <option value="UNASSIGNED">Unassigned</option>

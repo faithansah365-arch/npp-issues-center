@@ -42,7 +42,7 @@ export function PrivacyComplianceModal({
       aria-modal="true"
       aria-labelledby="privacy-modal-title"
     >
-      <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl border border-slate-200 max-h-[88dvh] flex flex-col overflow-hidden">
         <div className="grid grid-cols-3 h-1 w-full shrink-0" aria-hidden="true">
           <div className="bg-[#D41118]" />
           <div className="bg-white border-b border-slate-200/70" />
@@ -65,7 +65,7 @@ export function PrivacyComplianceModal({
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-5 text-sm text-slate-700 leading-relaxed">
+        <div className="p-5 sm:p-6 overflow-y-auto ios-scroll space-y-5 text-sm text-slate-700 leading-relaxed">
           {error && (
             <p className="text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
               {error}
@@ -127,7 +127,7 @@ export function PrivacyComplianceModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <div className="px-5 sm:px-6 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:py-4 border-t border-slate-200 bg-slate-50 flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}

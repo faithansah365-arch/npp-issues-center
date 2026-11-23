@@ -64,7 +64,7 @@ export const PWAInstallButton: React.FC<{
           aria-modal="true"
           aria-label="Install Mobile App Instructions"
         >
-          <div className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]">
+          <div className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-h-[90dvh] overflow-y-auto ios-scroll pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0">
             <div className="grid grid-cols-3 h-1 w-full" aria-hidden="true">
               <div className="bg-[#D41118]" />
               <div className="bg-white border-b border-slate-200/70" />

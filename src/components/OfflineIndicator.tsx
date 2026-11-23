@@ -31,7 +31,7 @@ export const OfflineIndicator: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 lg:bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 flex items-center justify-center sm:justify-start gap-2 rounded-xl bg-[#071A4D] border border-white/15 px-3.5 py-2.5 text-xs font-medium text-white shadow-lg"
+      className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-50 flex items-center justify-center sm:justify-start gap-2 rounded-xl bg-[#071A4D] border border-white/15 px-3.5 py-2.5 text-xs font-medium text-white shadow-lg"
     >
       <WifiOff className="w-4 h-4 text-[#F5C6C8] shrink-0" />
       <span>Offline Mode — Cached screens remain available; reconnect to submit updates.</span>
